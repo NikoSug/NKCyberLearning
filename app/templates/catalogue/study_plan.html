@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Mon planning — {{ instance_name }}{% endblock %}
+{% block content %}
+<header class="dash-head">
+  <div>
+    <p class="eyebrow">Mon apprentissage</p>
+    <h1>Mon planning</h1>
+    <p class="muted">Les documents de <a href="{% url 'catalogue:reading_list' %}">Ma lecture</a> sont répartis jour par jour,
+      dans l'ordre de votre liste, selon le temps dont vous disposez et les jours où vous lisez.</p>
+  </div>
+</header>
+
+<form method="post" class="card plan-settings">
+  {% csrf_token %}
+  <h2>Mon rythme de lecture</h2>
+  <div class="plan-row">
+    <div class="plan-row-label"><label for="{{ form.minutes_per_day.id_for_label }}">Temps par jour</label>
+      <span class="muted small">Le temps que vous pouvez consacrer à la lecture un jour de lecture.</span></div>
+    <div class="plan-row-field">{{ form.minutes_per_day }}
+      {% for error in form.minutes_per_day.errors %}<p class="error">{{ error }}</p>{% endfor %}</div>
+  </div>
+  <fieldset class="plan-row">
+    <div class="plan-row-label"><legend>Jours de lecture</legend>
+      <span class="muted small">Les autres jours sont des jours de repos : votre série de jours ne s'y casse pas.</span></div>
+    <div class="plan-row-field">
+      <div class="weekday-picker">{% for box in form.weekdays %}<label class="weekday">{{ box.tag }}<span>{{ box.choice_label }}</span></label>{% endfor %}</div>
+      {% for error in form.weekdays.errors %}<p class="error">{{ error }}</p>{% endfor %}
+    </div>
+  </fieldset>
+  <div class="plan-row">
+    <div class="plan-row-label"><label for="{{ form.reading_time.id_for_label }}">Heure de lecture</label>
+      <span class="muted small">Pour les rendez-vous ajoutés à votre agenda.</span></div>
+    <div class="plan-row-field">{{ form.reading_time }}
+      {% for error in form.reading_time.errors %}<p class="error">{{ error }}</p>{% endfor %}</div>
+  </div>
+  <div class="plan-actions">
+    <button type="submit">{% if plan %}Enregistrer{% else %}Créer mon planning{% endif %}</button>
+    {% if plan %}<span class="muted small">Actuellement : {{ plan.minutes_per_day }} min, {{ plan.weekdays_display }},
+      à {{ plan.reading_time|time:"G\hi" }}.</span>{% endif %}
+  </div>
+</form>
+
+{% if vacation %}
+  <p class="flash flash-info">🏖️ Mode vacances jusqu'au {{ vacation.end|date:"l j F" }} : aucune lecture n'est prévue
+    pendant cette période. <a href="{% url 'accounts:security' %}#vacances">Modifier</a></p>
+{% endif %}
+
+{% if plan %}
+  {% if days %}
+    <section class="card plan-summary">
+      <div class="plan-stats">
+        <div><span class="plan-stat-value">{{ remaining }}</span><span class="muted small">document{{ remaining|pluralize }} à lire</span></div>
+        <div><span class="plan-stat-value">{{ hours_left }} h</span><span class="muted small">de lecture, sur {{ days|length }} jour{{ days|length|pluralize }}</span></div>
+        <div><span class="plan-stat-value">{{ finish|date:"j M" }}</span><span class="muted small">fin estimée ({{ finish|date:"l" }})</span></div>
+      </div>
+      <div class="plan-export">
+        <a class="button secondary small" href="{% url 'catalogue:study_plan_ics' %}">📅 Ajouter à mon agenda</a>
+        <details>
+          <summary class="small">Comment l'importer ?</summary>
+          <p class="small muted">Le fichier contient un rendez-vous par jour de lecture, à l'heure choisie. Importez-le dans
+            Thunderbird (Événements et tâches → Importer), Google Agenda (Paramètres → Importer et exporter) ou Proton
+            Calendar (Paramètres → Importer). Le plus simple : l'importer dans un agenda dédié « Lectures » ; si votre
+            planning change, videz cet agenda puis importez le nouveau fichier.</p>
+        </details>
+      </div>
+    </section>
+    {% for day in days %}
+      {% ifchanged day.week_start %}
+        {% if not forloop.first %}</ul></section>{% endif %}
+        <section class="card week {% if day.week_start == this_week %}current{% endif %}">
+          <h2>{% if day.week_start == this_week %}Cette semaine{% else %}Semaine du {{ day.week_start|date:"j F" }}{% endif %}</h2>
+          <ul class="days">
+      {% endifchanged %}
+      <li class="day{% if day.date == today %} today{% endif %}">
+        <span class="day-date">{% if day.date == today %}Aujourd'hui{% elif day.date == tomorrow %}Demain{% else %}{{ day.date|date:"D j/m" }}{% endif %}</span>
+        <span class="day-items">
+          {% if day.continued %}<span class="muted">Suite de <a href="{{ day.continued.document.get_absolute_url }}">{{ day.continued.document.title }}</a></span>{% endif %}
+          {% for item in day.items %}<a href="{{ item.document.get_absolute_url }}">{{ item.document.title }}</a> <span class="muted">· {{ item.document.duration_display }}</span>{% if not forloop.last %}<br>{% endif %}{% endfor %}
+        </span>
+      </li>
+      {% if forloop.last %}</ul></section>{% endif %}
+    {% endfor %}
+  {% elif remaining == 0 %}
+    <section class="card empty">
+      <p>Rien à planifier : votre liste à lire est vide.</p>
+      <p><a class="button" href="{% url 'catalogue:search' %}">Trouver une lecture</a></p>
+    </section>
+  {% endif %}
+{% endif %}
+{% endblock %}

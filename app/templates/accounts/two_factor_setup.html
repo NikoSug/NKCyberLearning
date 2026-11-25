@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Double authentification — {{ instance_name }}{% endblock %}
+{% block content %}
+<section class="card narrow two-factor">
+  <h1>Activer la double authentification</h1>
+  {% if required %}<p class="flash flash-info">Votre rôle donne des droits étendus : la double authentification est obligatoire avant de continuer.</p>{% endif %}
+  <ol class="steps-list">
+    <li>Ouvrez une application d'authentification sur votre téléphone (Proton Pass, Aegis, FreeOTP, Google Authenticator…).</li>
+    <li>Scannez ce QR code, ou saisissez la clé à la main.</li>
+    <li>Entrez le code à 6 chiffres affiché par l'application.</li>
+  </ol>
+  <img class="qr" src="{{ qr }}" alt="QR code à scanner avec l'application d'authentification" width="245" height="245">
+  <p class="small muted">Clé : <code class="secret-key">{{ secret }}</code></p>
+  <form method="post" novalidate>{% csrf_token %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <label for="{{ form.code.id_for_label }}">Code à 6 chiffres</label>
+    {{ form.code }}
+    {% for error in form.code.errors %}<p class="error">{{ error }}</p>{% endfor %}
+    <button type="submit">Activer</button>
+  </form>
+  <form method="post" action="{% url 'accounts:logout' %}">{% csrf_token %}<button type="submit" class="link small">Se déconnecter</button></form>
+</section>
+{% endblock %}

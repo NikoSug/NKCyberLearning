@@ -1,0 +1,22 @@
+{% comment %}Champ « schéma d'exemple » d'une question (relecture et atelier), avec l'aperçu du schéma enregistré.{% endcomment %}
+{% load diagrams %}
+<div class="diagram-field">
+  <label>Schéma d'exemple <span class="muted">(facultatif : architecture, chemin d'une attaque, chaîne de confiance…)</span>
+    <textarea name="diagram" rows="{% if value %}4{% else %}1{% endif %}" class="mono" spellcheck="false" placeholder="flowchart LR&#10;PC[Poste de l'employé] -->|VPN| FW{Pare-feu}"{% if readonly %} readonly{% endif %}>{{ value }}</textarea>
+  </label>
+  <details class="small">
+    <summary>Comment écrire un schéma</summary>
+    <p class="muted">Syntaxe Mermaid simplifiée, une ligne par lien ; « flowchart LR » (de gauche à droite) ou « flowchart TD » (de haut en bas) en première ligne.</p>
+    <pre class="diagram-help">flowchart LR
+ATT[Attaquant]:::danger -.->|courriel piégé| PC[Poste de l'employé]
+PC -->|VPN| FW{Pare-feu}
+FW --> SRV[(Serveur de fichiers)]
+FW --> SAUV[Sauvegarde hors ligne]:::ok</pre>
+    <p class="muted">Formes : [rectangle], (arrondi), {contrôle}, [(base de données)]. Liens : --&gt; flèche, --- trait, -.-&gt; pointillés, ==&gt; épais ; texte du lien entre | |. Couleurs : :::danger (attaquant, élément compromis), :::ok (élément de confiance). 12 éléments au plus.</p>
+  </details>
+  {% if value %}
+    {% with svg=value|diagram %}
+      {% if svg %}{{ svg }}{% else %}<p class="small warn-text">Schéma illisible : il ne sera pas affiché.</p>{% endif %}
+    {% endwith %}
+  {% endif %}
+</div>

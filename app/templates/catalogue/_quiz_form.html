@@ -1,0 +1,30 @@
+{% comment %}
+Questionnaire à remplir (séries de test et révision du jour). `show_guide` : afficher le guide d'origine.
+Avec JavaScript, une question à la fois (data-quiz-step) ; sans, toutes s'affichent et le formulaire marche pareil.
+{% endcomment %}
+{% load diagrams %}
+<form method="post" class="quiz-form" data-quiz>
+  {% csrf_token %}
+  <div class="quiz-progress">
+    <progress class="progress" value="0" max="{{ questions|length }}" data-quiz-progress aria-label="Questions répondues">0</progress>
+    <span><span data-quiz-count>0</span> / {{ questions|length }} répondues</span>
+  </div>
+  {% for q in questions %}
+    <fieldset class="card question" data-quiz-step>
+      <legend class="question-text"><span class="ref">{{ forloop.counter }}</span><span>{{ q.text }}</span></legend>
+      {% if show_guide %}<p class="question-guide">{{ q.guide.title }}</p>{% endif %}
+      {% if q.diagram %}{{ q.diagram|diagram }}{% endif %}
+      <div class="choices-list">
+        {% for choice in q.choices %}
+          <label class="choice"><input type="radio" name="q{{ q.pk }}" value="{{ forloop.counter0 }}" required><span>{{ choice }}</span></label>
+        {% endfor %}
+      </div>
+    </fieldset>
+  {% endfor %}
+  <div class="quiz-nav" data-quiz-nav hidden>
+    <button type="button" class="secondary" data-quiz-prev>← Précédente</button>
+    <span class="muted small" data-quiz-position></span>
+    <button type="button" data-quiz-next>Suivante →</button>
+  </div>
+  <div class="quiz-submit"><button type="submit" data-quiz-submit>Valider mes réponses</button></div>
+</form>

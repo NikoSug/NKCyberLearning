@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% block title %}Tableau de bord — {{ instance_name }}{% endblock %}
+{% block content %}
+<header class="dash-head">
+  <div class="dash-hello">
+    <a href="{% url 'progression:shop' %}" title="Changer d'avatar">{% include "progression/_avatar.html" with avatar=xp.avatar name=user.username size="lg" frame=xp.frame %}</a>
+    <div>
+      <p class="eyebrow">{% now "l j F Y" %}</p>
+      <h1>Bonjour {{ user.username }}</h1>
+      {% if xp.profile_title %}<p class="profile-title">{{ xp.profile_title.name }}</p>{% endif %}
+    </div>
+  </div>
+  <form method="get" action="{% url 'catalogue:search' %}" class="dash-search" role="search">
+    <input type="search" name="q" placeholder="Rechercher un guide, une certification…" aria-label="Rechercher">
+    <button type="submit">Rechercher</button>
+  </form>
+</header>
+
+{% include "progression/_xp_hero.html" %}
+
+<section class="stats" aria-label="Mes chiffres">
+  <a class="stat" href="{% url 'catalogue:reading_list' %}">
+    <span class="stat-label">Documents lus</span>
+    <span class="stat-value">{{ stats.read }}<small> / {{ stats.in_list }}</small></span>
+    <progress class="progress" value="{{ stats.progress }}" max="100" aria-label="{{ stats.progress }} % de ma lecture">{{ stats.progress }} %</progress>
+  </a>
+  <a class="stat" href="{% url 'catalogue:tests_overview' %}">
+    <span class="stat-label">Séries de test faites</span>
+    <span class="stat-value">{{ stats.series_done }}</span>
+    <span class="stat-hint">{% if stats.average is not None %}score moyen {{ stats.average }} %{% else %}aucune pour l'instant{% endif %}</span>
+  </a>
+  <a class="stat" href="{% url 'progression:overview' %}">
+    <span class="stat-label">XP cette semaine</span>
+    <span class="stat-value">{{ xp.week_total }}<small> XP</small></span>
+    <span class="stat-hint">{{ xp.total }} XP au total</span>
+  </a>
+  <a class="stat" href="{% url 'catalogue:study_plan' %}">
+    <span class="stat-label">Temps de lecture</span>
+    <span class="stat-value">{% if plan %}{{ plan.minutes_per_day }}<small> min/jour{% if plan.weekdays|length < 7 %} · {{ plan.weekdays|length }} j/sem.{% endif %}</small>{% else %}—{% endif %}</span>
+    <span class="stat-hint">{% if plan %}{{ pending }} document{{ pending|pluralize }} à lire{% else %}planning à définir{% endif %}</span>
+  </a>
+</section>
+
+<div class="dash-grid">
+  <section class="card">
+    <h2>Aujourd'hui</h2>
+    <ul class="todo">
+      {% if review_available %}
+        <li class="todo-item">
+          <span class="todo-icon accent" aria-hidden="true">↻</span>
+          <div class="todo-body">
+            <strong>Révision du jour</strong>
+            <span class="muted">{% if review_best %}Faite · meilleur score {{ review_best.score }} / {{ review_best.total }}{% elif review %}{{ review.question_ids|length }} questions mélangées de vos guides lus{% else %}Questions mélangées de vos guides lus{% endif %}</span>
+          </div>
+          <a class="button small{% if review_best %} secondary{% endif %}" href="{% url 'catalogue:daily_review' %}">{% if review_best %}Refaire{% else %}Commencer{% endif %}</a>
+        </li>
+      {% endif %}
+      {% for entry in tests_today|slice:":4" %}
+        <li class="todo-item">
+          <span class="todo-icon ok" aria-hidden="true">✓</span>
+          <div class="todo-body">
+            <strong>{{ entry.guide.title }}</strong>
+            <span class="muted">Série {{ entry.next.number }} du test ouverte</span>
+          </div>
+          <a class="button small" href="{% url 'catalogue:quiz_take' entry.guide.slug entry.next.number %}">Série {{ entry.next.number }}</a>
+        </li>
+      {% endfor %}
+      {% for item in today_reading %}
+        <li class="todo-item">
+          <span class="todo-icon" aria-hidden="true">📖</span>
+          <div class="todo-body">
+            <strong>{{ item.document.title }}</strong>
+            <span class="muted">Lecture du jour · {{ item.document.duration_display }}</span>
+          </div>
+          <a class="button small secondary" href="{{ item.document.get_absolute_url }}">Lire</a>
+        </li>
+      {% endfor %}
+      {% if vacation %}
+        <li class="todo-item">
+          <span class="todo-icon" aria-hidden="true">🏖️</span>
+          <div class="todo-body">
+            <strong>Bonnes vacances !</strong>
+            <span class="muted">Jusqu'au {{ vacation.end|date:"l j F" }} : pas de lecture prévue et votre série est protégée.
+              {% if next_reading_day %}Reprise le {{ next_reading_day|date:"l j F" }}.{% endif %}</span>
+          </div>
+          <a class="button small secondary" href="{% url 'accounts:security' %}#vacances">Mode vacances</a>
+        </li>
+      {% elif next_reading_day %}
+        <li class="todo-item">
+          <span class="todo-icon" aria-hidden="true">🗓️</span>
+          <div class="todo-body">
+            <strong>Pas de lecture prévue aujourd'hui</strong>
+            <span class="muted">Prochaine lecture le {{ next_reading_day|date:"l j F" }} ({{ plan.weekdays_display }})</span>
+          </div>
+          <a class="button small secondary" href="{% url 'catalogue:study_plan' %}">Planning</a>
+        </li>
+      {% endif %}
+      {% if not review_available and not tests_today and not today_reading and not next_reading_day and not vacation %}
+        <li class="todo-empty muted">Rien de prévu aujourd'hui.
+          {% if not plan %}<a href="{% url 'catalogue:study_plan' %}">Définissez votre temps de lecture</a>
+          {% else %}<a href="{% url 'catalogue:search' %}">Trouvez une nouvelle lecture</a>{% endif %}.</li>
+      {% endif %}
+    </ul>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>{% if today_reading %}Ensuite dans ma lecture{% else %}À lire ensuite{% endif %}</h2>
+      <a href="{% url 'catalogue:reading_list' %}">Ma lecture →</a>
+    </div>
+    {% for item in next_reading %}
+      <div class="item">
+        <div class="item-body">
+          <a href="{{ item.document.get_absolute_url }}" class="item-title">{{ item.document.title }}</a>
+          <p class="meta">
+            {% if item.is_guide %}<span class="level level-{{ item.document.level }}">{{ item.document.get_level_display }}</span>{% else %}<span class="tag">Référentiel</span>{% endif %}
+            <span>{{ item.document.duration_display }}</span>
+            {% if item.started_at %}<span>En cours</span>{% endif %}
+          </p>
+        </div>
+      </div>
+    {% empty %}
+      {% if pending %}<p class="empty-state">Rien d'autre en attente après la lecture du jour.</p>{% else %}
+      <p class="muted">Votre liste est vide. Cherchez un sujet puis ajoutez-le avec <span class="add-sample">+</span>.</p>
+      <p><a class="button secondary" href="{% url 'catalogue:guide_list' %}">Parcourir les guides</a></p>{% endif %}
+    {% endfor %}
+  </section>
+</div>
+
+<div class="section-title">
+  <h2>Mes parcours</h2>
+  <a href="{% url 'catalogue:path_list' %}">Tous les parcours →</a>
+</div>
+<div class="path-grid">
+  {% for path in paths_current %}
+    <a class="card path-mini" href="{% url 'catalogue:path_detail' path.category.slug %}">
+      <span class="path-name">{{ path.category.name }}</span>
+      <progress class="progress" value="{{ path.read }}" max="{{ path.total }}" aria-label="{{ path.percent }} % lu">{{ path.percent }} %</progress>
+      <span class="muted small">{{ path.read }} / {{ path.total }} lus{% if path.next_guide %} · prochain : {{ path.next_guide.title|truncatechars:55 }}{% endif %}</span>
+    </a>
+  {% endfor %}
+  {% if path_suggestion and paths_current|length < 3 %}
+    <a class="card path-mini suggestion" href="{% url 'catalogue:path_detail' path_suggestion.category.slug %}">
+      <span class="eyebrow">{% if paths_current %}À découvrir{% else %}Pour commencer{% endif %}</span>
+      <span class="path-name">{{ path_suggestion.category.name }}</span>
+      <span class="muted small">{{ path_suggestion.total }} guides · du niveau débutant à avancé</span>
+    </a>
+  {% endif %}
+</div>
+
+<div class="section-title">
+  <h2>Veille cyber</h2>
+  <span class="muted">{% if news_refreshed %}Mis à jour il y a {{ news_refreshed|timesince }}{% else %}Pas encore récupérée{% endif %}</span>
+</div>
+
+<div class="dash-grid news-grid">
+  <section class="card">
+    <div class="card-head">
+      <h2>Actualités</h2>
+      <span class="muted small">CERT-FR · Cybermalveillance · presse</span>
+    </div>
+    {% for alert in alerts %}
+      <a class="news alert" href="{{ alert.url }}" target="_blank" rel="noopener noreferrer">
+        <span class="news-tag">Alerte CERT-FR</span>
+        <span class="news-title">{{ alert.title }}</span>
+        <span class="news-meta">{{ alert.published_at|date:"d/m/Y" }}</span>
+      </a>
+    {% endfor %}
+    {% for article in articles %}
+      <a class="news" href="{{ article.url }}" target="_blank" rel="noopener noreferrer">
+        <span class="news-title">{{ article.title }}</span>
+        {% if article.summary %}<span class="news-summary">{{ article.summary|truncatechars:170 }}</span>{% endif %}
+        <span class="news-meta">{{ article.source_name }} · {{ article.published_at|date:"d/m/Y" }}</span>
+      </a>
+    {% empty %}
+      {% if not alerts %}<p class="empty-state">Aucune actualité récupérée pour l'instant.</p>{% endif %}
+    {% endfor %}
+    <p class="card-foot small"><a href="https://www.cert.ssi.gouv.fr/" target="_blank" rel="noopener noreferrer">Toutes les alertes du CERT-FR →</a></p>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>Fuites de données</h2>
+      <a href="https://bonjourlafuite.eu.org/" target="_blank" rel="noopener noreferrer" class="small">C'est qui qui a fuité aujourd'hui ? →</a>
+    </div>
+    {% for leak in leaks %}
+      <a class="news leak" href="{{ leak.url }}" target="_blank" rel="noopener noreferrer">
+        <span class="news-title">
+          {{ leak.title }}
+          {% if leak.confirmed %}<span class="pill ok">Confirmée</span>{% elif leak.confirmed is False %}<span class="pill warn">Non confirmée</span>{% endif %}
+          {% if leak.sensitive %}<span class="pill danger">Données sensibles</span>{% endif %}
+        </span>
+        {% if leak.details %}<span class="chips">{% for detail in leak.details|slice:":5" %}<span class="chip">{{ detail }}</span>{% endfor %}{% if leak.details|length > 5 %}<span class="chip more">+{{ leak.details|length|add:"-5" }}</span>{% endif %}</span>{% endif %}
+        <span class="news-meta">{{ leak.published_at|date:"d/m/Y" }}</span>
+      </a>
+    {% empty %}
+      <p class="empty-state">Aucune fuite récupérée pour l'instant.</p>
+    {% endfor %}
+    <p class="card-foot small"><a href="https://bonjourlafuite.eu.org/" target="_blank" rel="noopener noreferrer">Toutes les fuites sur Bonjour la fuite →</a></p>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,8 @@
+{% comment %}Bouton « J'ai lu ce document ». Paramètres : doc, kind ("guide" ou "referentiel").{% endcomment %}
+<form method="post" action="{% url 'catalogue:reading_finish' %}" class="inline">
+  {% csrf_token %}
+  <input type="hidden" name="kind" value="{{ kind }}">
+  <input type="hidden" name="slug" value="{{ doc.slug }}">
+  <input type="hidden" name="next" value="{{ request.get_full_path }}">
+  <button type="submit" class="secondary">J'ai lu ce document</button>
+</form>

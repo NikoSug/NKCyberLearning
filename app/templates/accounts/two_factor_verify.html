@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Vérification — {{ instance_name }}{% endblock %}
+{% block content %}
+<section class="card narrow two-factor">
+  <h1>Vérification en deux étapes</h1>
+  <p class="muted">Entrez le code à 6 chiffres affiché par votre application d'authentification, ou un de vos codes de secours.</p>
+  <form method="post" novalidate>{% csrf_token %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <label for="{{ form.code.id_for_label }}">Code</label>
+    {{ form.code }}
+    {% for error in form.code.errors %}<p class="error">{{ error }}</p>{% endfor %}
+    <button type="submit">Valider</button>
+  </form>
+  <form method="post" action="{% url 'accounts:logout' %}">{% csrf_token %}<button type="submit" class="link small">Se déconnecter</button></form>
+</section>
+{% endblock %}

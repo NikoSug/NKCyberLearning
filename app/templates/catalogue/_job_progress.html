@@ -1,0 +1,8 @@
+{% comment %}Avancement d'une génération (QCM, cours, lexique, audio), au même format partout. `job` : generation.job_progress.{% endcomment %}
+<div class="job-progress">
+  <div class="job-progress-line">
+    <span class="job-step">{{ job.label }}</span>
+    {% if job.elapsed %}<span class="muted">· depuis {{ job.elapsed }}</span>{% endif %}
+  </div>
+  {% if job.total %}<progress class="progress" value="{{ job.done }}" max="{{ job.total }}" aria-label="{{ job.done }} étape(s) terminée(s) sur {{ job.total }}" title="{{ job.done }} / {{ job.total }} terminé(s)">{{ job.percent }} %</progress>{% endif %}
+</div>

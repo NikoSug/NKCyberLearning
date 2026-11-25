@@ -1,0 +1,38 @@
+# Secrets (historique complet), vulnérabilités des dépendances et de l'image de production.
+name: Sécurité
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+  schedule:
+    - cron: '0 6 * * 1' # chaque lundi : nouvelles CVE sur des dépendances inchangées
+
+permissions:
+  contents: read
+
+jobs:
+  secrets:
+    name: Secrets (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks
+        run: docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.28.0 git /repo --redact -v
+
+  dependances:
+    name: Vulnérabilités (Trivy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Trivy — dépendances, Dockerfile et config
+        run: >
+          docker run --rm -v "$PWD:/src" aquasec/trivy:0.67.2
+          fs --scanners vuln,misconfig --severity HIGH,CRITICAL --exit-code 1 --ignore-unfixed /src
+      - name: Trivy — image de production
+        run: |
+          docker build -t cyberlearning-web:ci .
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.67.2 \
+            image --severity HIGH,CRITICAL --exit-code 1 --ignore-unfixed cyberlearning-web:ci

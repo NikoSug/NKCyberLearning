@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Relecture — {{ draft.subject }} — {{ instance_name }}{% endblock %}
+{% block content %}
+<p class="back-link"><a href="{% url 'catalogue:review_list' %}?type=qcm">← Relecture</a></p>
+<header class="dash-head">
+  <div>
+    <p class="eyebrow">🧠 QCM d'un {% if draft.referential %}référentiel{% else %}guide{% endif %}{% if draft.author %} · par {{ draft.author.username }}{% elif draft.llm_model %} · généré par {{ draft.llm_model }}{% endif %}{% if draft.generated_at %} le {{ draft.generated_at|date:"d/m/Y" }}{% endif %}</p>
+    <h1>{{ draft.subject }}</h1>
+    {% if draft.referential %}
+    <p class="links small"><a href="{{ draft.referential.get_absolute_url }}">Fiche du référentiel</a>
+      {% if draft.referential.document %}<a href="{% url 'catalogue:referential_read' draft.referential.slug %}" target="_blank" rel="noopener">Ouvrir le PDF</a>{% endif %}</p>
+    {% else %}
+    <p class="links small"><a href="{{ draft.guide.get_absolute_url }}">Fiche du guide</a>
+      {% with doc=draft.guide.documents.first %}{% if doc and doc.file %}<a href="{% url 'catalogue:guide_read' draft.guide.slug doc.pk %}" target="_blank" rel="noopener">Ouvrir le PDF</a>{% endif %}{% endwith %}</p>
+    {% endif %}
+  </div>
+</header>
+
+<section class="editor-bar">
+  {% if draft.status == "a_relire" %}
+    {% include "studio/_status.html" with code=draft.status label=draft.get_status_display hint="Acceptez, corrigez ou rejetez chaque question, puis publiez." %}
+  {% else %}
+    {% include "studio/_status.html" with code=draft.status label=draft.get_status_display %}
+  {% endif %}
+  <div class="editor-bar-actions">
+    {% if draft.status == "a_relire" %}
+      <form method="post" action="{% url 'catalogue:review_draft' draft.pk %}">{% csrf_token %}<input type="hidden" name="action" value="publier">
+        <button type="submit"{% if not can_publish %} disabled title="Il faut {{ per_series }} questions acceptées dans chaque série"{% endif %}>Publier</button></form>
+      {% if draft.author %}
+        <form method="post" action="{% url 'studio:qcm_action' draft.pk %}">{% csrf_token %}
+          <button type="submit" name="action" value="renvoyer" class="secondary">Renvoyer au rédacteur</button></form>
+      {% endif %}
+      <form method="post" action="{% url 'catalogue:review_draft' draft.pk %}" data-confirm="Accepter toutes les questions en attente que l'IA a su vérifier ?">{% csrf_token %}
+        <input type="hidden" name="action" value="accepter-verifiees">
+        <button type="submit" class="secondary"{% if not pending %} disabled{% endif %}>Accepter les vérifiées</button></form>
+      {% if rejected and ai_enabled %}
+        <form method="post" action="{% url 'catalogue:review_draft' draft.pk %}" data-confirm="Régénérer les {{ rejected }} question(s) rejetée(s) ?">{% csrf_token %}
+          <input type="hidden" name="action" value="relancer"><button type="submit" class="secondary">✨ Régénérer les rejetées ({{ rejected }})</button></form>
+      {% endif %}
+      <form method="post" action="{% url 'catalogue:review_draft' draft.pk %}" data-confirm="Abandonner ce brouillon ?">{% csrf_token %}
+        <input type="hidden" name="action" value="abandonner"><button type="submit" class="link small">Abandonner</button></form>
+    {% endif %}
+  </div>
+</section>
+
+{% if not questions %}
+  <p class="muted">Ce brouillon ne contient aucune question.</p>
+{% else %}
+{% include "catalogue/_prereview_notes.html" with notes=prereview_summary %}
+<div class="review-progress">
+  <span><strong>{{ accepted }}</strong> acceptée{{ accepted|pluralize }} · <strong>{{ rejected }}</strong> rejetée{{ rejected|pluralize }} · <strong>{{ pending }}</strong> à valider</span>
+  <progress class="progress" value="{{ accepted|add:rejected }}" max="{{ questions|length }}">{{ accepted|add:rejected }}</progress>
+</div>
+
+{# Carte des questions : un carré par question, groupé par série ; cliquer pour y aller. #}
+<nav class="review-map" aria-label="Questions du brouillon">
+  {% for s in series %}
+    <div class="review-map-series">
+      <span class="small{% if s.accepted >= per_series %} ok-text{% else %} muted{% endif %}" title="{{ s.level }}">Série {{ s.number }} · {{ s.accepted }}/{{ per_series }}</span>
+      <div class="review-map-cells">
+        {% for q in s.questions %}
+          <a href="?q={{ q.pk }}" class="review-cell decision-{{ q.decision }}{% if q.cross_check is False or q.prereview == "douteuse" %} flagged{% endif %}{% if q.pk == current.pk %} current{% endif %}"
+             title="Série {{ q.series }} · {{ q.get_decision_display }}{% if q.cross_check is False or q.prereview == "douteuse" %} · à vérifier{% endif %}"{% if q.pk == current.pk %} aria-current="true"{% endif %}>{{ forloop.counter }}</a>
+        {% endfor %}
+      </div>
+    </div>
+  {% endfor %}
+</nav>
+
+{% with q=current %}
+<form method="post" action="{% url 'catalogue:review_question' q.pk %}" class="card review-question review-single decision-{{ q.decision }}" data-review-question>
+  {% csrf_token %}
+  <div class="review-head">
+    <span class="eyebrow">Question {{ index }} sur {{ questions|length }} · série {{ q.series }} — {{ level }}</span>
+  </div>
+  <div class="review-head">
+    <span class="badge{% if q.decision == 'acceptee' %} read{% elif q.decision == 'rejetee' %} danger-badge{% endif %}">{{ q.get_decision_display }}</span>
+    {% if q.cross_check is False %}<span class="pill warn">À vérifier : l'IA s'est trompée en y répondant</span>{% elif q.cross_check %}<span class="pill ok">Vérifiée par l'IA</span>{% endif %}
+    {% if q.edited %}<span class="pill">Corrigée</span>{% endif %}
+    {% if q.prereview == "douteuse" %}<span class="pill warn">Douteuse selon le pré-relecteur</span>{% elif q.prereview == "regeneree" %}<span class="pill">Régénérée par le pré-relecteur</span>{% elif q.prereview == "ok" %}<span class="pill ok">Pré-relue : rien à signaler</span>{% endif %}
+    <span class="muted small">{{ q.context_title|truncatechars:90 }}</span>
+  </div>
+  {% include "catalogue/_prereview_notes.html" with note=q.prereview_note notes=None %}
+  <label>Question<textarea name="text" rows="2">{{ q.text }}</textarea></label>
+  <label class="answer-ok">Bonne réponse<input type="text" name="correct" value="{{ q.choices.0 }}"></label>
+  {% for wrong in q.choices|slice:"1:" %}
+    <label class="answer-ko">Mauvaise réponse {{ forloop.counter }}<input type="text" name="wrong_{{ forloop.counter }}" value="{{ wrong }}"></label>
+  {% endfor %}
+  {% if q.choices|length < 5 %}<label class="answer-ko">Mauvaise réponse (facultative)<input type="text" name="wrong_4" value=""></label>{% endif %}
+  <div class="review-grid">
+    <label>Explication<textarea name="explanation" rows="2">{{ q.explanation }}</textarea></label>
+    <label>Source<input type="text" name="source" value="{{ q.source }}"></label>
+  </div>
+  {% include "catalogue/_diagram_field.html" with value=q.diagram %}
+  {% if draft.status == "a_relire" %}
+  <div class="actions">
+    <button type="submit" name="action" value="accepter" data-shortcut="a"{% if q.decision == 'acceptee' %} disabled{% endif %}>Accepter <kbd>A</kbd></button>
+    <button type="submit" name="action" value="enregistrer" class="secondary">Enregistrer les corrections et accepter</button>
+    <button type="submit" name="action" value="rejeter" class="secondary" data-shortcut="r"{% if q.decision == 'rejetee' %} disabled{% endif %}>Rejeter <kbd>R</kbd></button>
+    {% if q.decision != 'a_valider' %}<button type="submit" name="action" value="a-valider" class="link small">Remettre à valider</button>{% endif %}
+  </div>
+  {% endif %}
+</form>
+
+<nav class="review-steps" aria-label="Navigation entre les questions">
+  {% if previous %}<a class="button secondary" href="?q={{ previous.pk }}" data-shortcut="arrowleft">← Précédente</a>{% else %}<span></span>{% endif %}
+  <span class="muted small">Raccourcis : <kbd>A</kbd> accepter · <kbd>R</kbd> rejeter · <kbd>←</kbd> <kbd>→</kbd> naviguer</span>
+  {% if next %}<a class="button secondary" href="?q={{ next.pk }}" data-shortcut="arrowright">Suivante →</a>{% else %}<span></span>{% endif %}
+</nav>
+{% endwith %}
+{% endif %}
+{% endblock %}

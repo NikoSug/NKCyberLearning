@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Écouter — {{ guide.title }} — {{ instance_name }}{% endblock %}
+{% block content %}
+<p class="back-link"><a href="{{ guide.get_absolute_url }}">← Fiche du guide</a></p>
+<header class="dash-head">
+  <p class="eyebrow">Version audio{% if ready %} · {{ sections|length }} chapitre{{ sections|length|pluralize }} · {{ audio.duration_display }}{% endif %}</p>
+  <h1>{{ guide.title }}</h1>
+</header>
+
+{% if ready %}
+  <section class="card player" data-player
+           data-progress-url="{% url 'catalogue:listen_progress' guide.slug %}"
+           data-start-section="{{ progress.section|default:1 }}" data-start-seconds="{{ progress.seconds|default:0|stringformat:'.1f' }}"
+           data-title="{{ guide.title }}">
+    {% csrf_token %}
+    <audio preload="metadata" data-audio></audio>
+    <p class="player-now"><span class="eyebrow">En cours</span> <strong data-now-title>{{ sections.0.title }}</strong></p>
+    <div class="player-bar">
+      <span class="player-time" data-time>0:00</span>
+      <input type="range" min="0" max="100" step="0.1" value="0" data-seek aria-label="Position dans le chapitre">
+      <span class="player-time" data-duration>0:00</span>
+    </div>
+    <div class="player-controls">
+      <button type="button" class="icon round" data-prev title="Chapitre précédent" aria-label="Chapitre précédent">⏮</button>
+      <button type="button" class="icon round" data-back title="Reculer de 15 secondes" aria-label="Reculer de 15 secondes">↺ 15</button>
+      <button type="button" class="play" data-play aria-label="Lecture">▶</button>
+      <button type="button" class="icon round" data-forward title="Avancer de 15 secondes" aria-label="Avancer de 15 secondes">15 ↻</button>
+      <button type="button" class="icon round" data-next title="Chapitre suivant" aria-label="Chapitre suivant">⏭</button>
+      <label class="speed">Vitesse
+        <select data-speed>
+          <option value="0.75">×0,75</option><option value="1" selected>×1</option><option value="1.25">×1,25</option>
+          <option value="1.5">×1,5</option><option value="1.75">×1,75</option><option value="2">×2</option>
+        </select>
+      </label>
+    </div>
+    <p class="player-status muted small" data-status aria-live="polite">
+      {% if progress.completed_at %}Écoute terminée le {{ progress.completed_at|date:"d/m/Y" }} : le guide est marqué comme lu.
+      {% else %}Écoutez tous les chapitres jusqu'au bout : le guide sera marqué comme lu et son test s'ouvrira.{% endif %}
+    </p>
+  </section>
+
+  <h2 class="group-title">Chapitres</h2>
+  <ol class="chapters">
+    {% for section in sections %}
+      <li class="chapter{% if section.listened %} listened{% endif %}" data-chapter data-position="{{ section.position }}"
+          data-src="{% url 'catalogue:narration_audio' guide.slug section.position %}" data-title="{{ section.title }}">
+        <button type="button" class="chapter-button" data-chapter-play>
+          <span class="chapter-mark" aria-hidden="true">{% if section.listened %}✓{% else %}{{ section.position }}{% endif %}</span>
+          <span class="chapter-title">{{ section.title }}</span>
+          <span class="muted small">{{ section.clock }}</span>
+        </button>
+        <details class="transcript">
+          <summary class="small">Texte lu</summary>
+          <p>{{ section.text|linebreaksbr }}</p>
+        </details>
+      </li>
+    {% endfor %}
+  </ol>
+
+  {% if audio.voice|slice:":15" == "Enregistrement " %}
+  <p class="muted small credit">{{ audio.voice }} (voix humaine) : tableaux, schémas et extraits de code ne sont pas forcément lus.
+    Pour tout ce qui est visuel, <a href="{{ guide.get_absolute_url }}">consultez le document</a>.</p>
+  {% elif "Kyutai" in audio.voice %}
+  <p class="muted small credit">Texte du PDF adapté pour l'oral par une IA locale, puis lu par synthèse vocale
+    (Kyutai TTS, licence CC BY 4.0 ; voix « développeuse » de Kyutai, CC0) : tableaux, schémas et extraits de code
+    ne sont pas lus. Pour tout ce qui est visuel, <a href="{{ guide.get_absolute_url }}">consultez le document</a>.</p>
+  {% else %}
+  <p class="muted small credit">Lecture par synthèse vocale (Piper) à partir du texte du PDF : tableaux, schémas et extraits de code
+    ne sont pas lus. Voix « {{ audio.voice|default:"siwis" }} », licence CC BY 4.0. Pour tout ce qui est visuel,
+    <a href="{{ guide.get_absolute_url }}">consultez le document</a>.</p>
+  {% endif %}
+  {% if outdated %}
+    <form method="post" class="inline">{% csrf_token %}<button type="submit" class="link small">Régénérer avec la nouvelle voix et le texte adapté à l'oral</button></form>
+  {% endif %}
+
+{% elif audio and audio.status == "attente" or audio and audio.status == "en_cours" %}
+  <section class="card offer" data-auto-refresh="20">
+    <span class="bonus-icon" aria-hidden="true">🎙️</span>
+    <div>
+      <h2>Version audio en préparation</h2>
+      <p>{% include "catalogue/_job_status.html" with status=audio.status %}
+        {% if audio.status == "attente" %}<span class="muted small">{% if queue_position > 1 %}{{ queue_position }}ᵉ position{% else %}la prochaine à être générée{% endif %}</span>{% endif %}</p>
+      {% if job %}{% include "catalogue/_job_progress.html" %}{% endif %}
+      <p class="muted small">Cette page se met à jour toute seule. Vous pouvez aussi revenir plus tard.</p>
+    </div>
+  </section>
+
+{% else %}
+  <section class="card offer">
+    <span class="bonus-icon" aria-hidden="true">🎧</span>
+    <div>
+      <h2>{% if audio.status == "echec" %}La génération a échoué{% else %}Écouter ce guide{% endif %}</h2>
+      {% if audio.status == "echec" %}<p class="error small">{{ audio.error|truncatechars:200 }}</p>{% endif %}
+      {% if not ai_enabled %}
+        <p class="muted">Ce guide n'a pas encore de version audio. La synthèse vocale n'est pas activée sur cette installation ;
+          un rédacteur peut déposer un enregistrement depuis l'atelier de création.</p>
+      {% elif has_document %}
+        <p class="muted">Le guide est lu à voix haute, chapitre par chapitre. La version audio est générée à la première demande ;
+          comptez quelques minutes.</p>
+      {% else %}
+        <p class="muted">Ce guide n'a pas de document PDF : il ne peut pas être lu à voix haute.</p>
+      {% endif %}
+    </div>
+    {% if has_document and ai_enabled %}
+      <form method="post">{% csrf_token %}<button type="submit">{% if audio.status == "echec" %}Réessayer{% else %}Créer la version audio{% endif %}</button></form>
+    {% endif %}
+  </section>
+{% endif %}
+{% include "catalogue/_source.html" with item=guide derived=True %}
+{% endblock %}

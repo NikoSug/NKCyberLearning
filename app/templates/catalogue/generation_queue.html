@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}File d'attente — {{ title }} — {{ instance_name }}{% endblock %}
+{% block content %}
+<p class="back-link"><a href="{% url 'catalogue:generation_dashboard' %}#{{ kind }}">← Générations</a></p>
+<header class="dash-head">
+  <div>
+    <p class="eyebrow">File d'attente · {{ rows|length }} élément{{ rows|length|pluralize }}</p>
+    <h1>{{ title }}</h1>
+    <p class="muted small">Dans l'ordre où le service les traitera : le premier est le prochain à être généré.
+      {% if kind == "audio" %}Les demandes des utilisateurs passent d'abord ; un élément placé devant l'une d'elles devient prioritaire lui aussi.{% endif %}
+      Retirer un élément ne perd rien de ce qui a déjà été relu ou publié.</p>
+  </div>
+  {% if rows %}
+  <form method="post" action="{% url 'catalogue:generation_queue_action' kind %}"
+        data-confirm="Retirer les {{ rows|length }} élément(s) de la file ?{% if kind == 'audio' %} Les régénérations en attente sont annulées : ces guides gardent leur ancienne voix.{% endif %} Ils pourront être remis en file plus tard.">{% csrf_token %}
+    <input type="hidden" name="action" value="vider"><button type="submit" class="small secondary">Tout retirer</button>
+  </form>
+  {% endif %}
+</header>
+
+<nav class="tabs" aria-label="Files d'attente">
+  {% for value, label in titles %}<a href="{% url 'catalogue:generation_queue' value %}"{% if value == kind %} aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}
+</nav>
+
+{% if rows %}
+  <ol class="queue-list">
+    {% for row in rows %}
+      <li class="card queue-row" id="e{{ row.item.pk }}">
+        <span class="queue-position" aria-label="Position {{ row.position }}">{{ row.position }}</span>
+        <div class="queue-body">
+          <strong>{{ row.title }}</strong>
+          {% if row.note or row.progress %}<span class="muted small">{{ row.note }}{% if row.note and row.progress %} · {% endif %}{{ row.progress }}</span>{% endif %}
+        </div>
+        <form method="post" action="{% url 'catalogue:generation_queue_action' kind %}" class="queue-actions">{% csrf_token %}
+          <input type="hidden" name="item" value="{{ row.item.pk }}">
+          <button type="submit" name="action" value="haut" class="icon" title="Mettre en tête de file" aria-label="Mettre en tête de file"{% if forloop.first %} disabled{% endif %}>⤒</button>
+          <button type="submit" name="action" value="monter" class="icon" title="Monter d'une place" aria-label="Monter d'une place"{% if forloop.first %} disabled{% endif %}>↑</button>
+          <button type="submit" name="action" value="descendre" class="icon" title="Descendre d'une place" aria-label="Descendre d'une place"{% if forloop.last %} disabled{% endif %}>↓</button>
+          <button type="submit" name="action" value="bas" class="icon" title="Mettre en fin de file" aria-label="Mettre en fin de file"{% if forloop.last %} disabled{% endif %}>⤓</button>
+          <button type="submit" name="action" value="retirer" class="icon danger" title="Retirer de la file" aria-label="Retirer de la file"
+                  data-confirm="Retirer « {{ row.title }} » de la file ?">✕</button>
+        </form>
+      </li>
+    {% endfor %}
+  </ol>
+{% else %}
+  <p class="empty-state">File vide : rien n'attend d'être généré.</p>
+{% endif %}
+{% endblock %}

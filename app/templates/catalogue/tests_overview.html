@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Mes tests — {{ instance_name }}{% endblock %}
+{% block content %}
+<header class="dash-head">
+  <div>
+    <p class="eyebrow">Mon apprentissage</p>
+    <h1>Mes tests</h1>
+    <p class="muted">Chaque guide lu ouvre un test en 6 séries, des questions les plus simples aux plus difficiles.
+      Une nouvelle série s'ouvre chaque jour ; les séries déjà faites peuvent être refaites à tout moment.</p>
+  </div>
+</header>
+
+{% if review_available %}
+  <section class="progress-card review-card">
+    <div>
+      <h2>Révision du jour</h2>
+      <p class="muted">Questions mélangées de vos guides lus, en priorité celles ratées ou à revoir.
+        {% if review_streak > 1 %}<strong>{{ review_streak }} jours de suite.</strong>{% endif %}</p>
+      {% if review_best %}<p><span class="badge read">Faite · meilleur score {{ review_best.score }} / {{ review_best.total }}</span></p>{% endif %}
+    </div>
+    <a class="button{% if review_best %} secondary{% endif %}" href="{% url 'catalogue:daily_review' %}">{% if review_best %}Refaire{% else %}Commencer{% endif %}</a>
+  </section>
+{% endif %}
+
+{% if not today and not upcoming and not finished and not waiting %}
+  <section class="card empty">
+    <p>Aucun test pour l'instant.</p>
+    <p class="muted">Lisez un guide puis marquez-le comme lu : son test s'ouvrira ici.</p>
+    <p><a class="button" href="{% url 'catalogue:reading_list' %}">Ma lecture</a></p>
+  </section>
+{% endif %}
+
+{% if today %}
+  <h2 class="group-title">À faire aujourd'hui <span class="count">{{ today|length }}</span></h2>
+  {% for entry in today %}
+    <div class="item test-item">
+      <div class="item-body">
+        <a href="{{ entry.guide.get_absolute_url }}" class="item-title">{{ entry.guide.title }}</a>
+        {% include "catalogue/_quiz_series.html" with guide=entry.guide series=entry.series %}
+      </div>
+      <a class="button" href="{% url 'catalogue:quiz_take' entry.guide.slug entry.next.number %}">Série {{ entry.next.number }}</a>
+    </div>
+  {% endfor %}
+{% endif %}
+
+{% if upcoming %}
+  <h2 class="group-title">Prochaine série demain <span class="count">{{ upcoming|length }}</span></h2>
+  {% for entry in upcoming %}
+    <div class="item test-item">
+      <div class="item-body">
+        <a href="{{ entry.guide.get_absolute_url }}" class="item-title">{{ entry.guide.title }}</a>
+        {% include "catalogue/_quiz_series.html" with guide=entry.guide series=entry.series %}
+      </div>
+    </div>
+  {% endfor %}
+{% endif %}
+
+{% if finished %}
+  <h2 class="group-title">Tests terminés <span class="count">{{ finished|length }}</span></h2>
+  {% for entry in finished %}
+    <div class="item test-item done">
+      <div class="item-body">
+        <a href="{{ entry.guide.get_absolute_url }}" class="item-title">{{ entry.guide.title }}</a>
+        {% include "catalogue/_quiz_series.html" with guide=entry.guide series=entry.series %}
+      </div>
+    </div>
+  {% endfor %}
+{% endif %}
+
+{% if waiting %}
+  <h2 class="group-title">Tests en préparation <span class="count">{{ waiting|length }}</span></h2>
+  <p class="muted">Ces guides sont lus mais leurs questions ne sont pas encore rédigées.</p>
+  <ul class="plain">{% for guide in waiting %}<li><a href="{{ guide.get_absolute_url }}">{{ guide.title }}</a></li>{% endfor %}</ul>
+{% endif %}
+{% endblock %}

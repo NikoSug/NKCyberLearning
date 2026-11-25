@@ -1,0 +1,10 @@
+{% comment %}
+  Attribution exigée par la Licence Ouverte v2.0 (Etalab) pour les publications de l'ANSSI : source et date.
+  Paramètres : item (guide ou référentiel ANSSI), derived (contenu adapté : cours, QCM, audio, podcast).
+{% endcomment %}
+{% if item.is_anssi %}
+<p class="source-note">Source : ANSSI — « {% firstof item.title item.name %} »{% if item.version %}, version {{ item.version }}{% endif %}{% if item.published_on %}, {{ item.published_on|date:"F Y" }}{% endif %}.
+  Réutilisé sous <a href="https://www.etalab.gouv.fr/licence-ouverte-open-licence/" target="_blank" rel="noopener noreferrer">Licence Ouverte v2.0</a>{% if derived %} ;
+  contenu adapté par {{ instance_name }}, sans validation de l'ANSSI{% endif %}.{% if item.source_url %}
+  <a href="{{ item.source_url }}" target="_blank" rel="noopener noreferrer">Document original</a>{% endif %}</p>
+{% endif %}

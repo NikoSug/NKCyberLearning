@@ -1,0 +1,8 @@
+{% comment %}
+  Partie gauche de la barre d'état d'un éditeur : l'état (même code couleur partout) et ce qu'il faut faire ensuite.
+  Paramètres : code (redaction, a_relire, publie, attente, generation…), label, hint.
+{% endcomment %}
+<div class="editor-bar-state">
+  <span class="status {% if code == 'a_relire' or code == 'a_enregistrer' %}review{% elif code == 'publie' or code == '' %}done{% elif code == 'generation' or code == 'enregistrement' or code == 'attente' %}run{% elif code == 'echec' %}error{% else %}idle{% endif %}">{{ label }}</span>
+  {% if hint %}<p class="small muted">{{ hint }}</p>{% endif %}
+</div>

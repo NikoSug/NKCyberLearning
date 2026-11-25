@@ -1,0 +1,20 @@
+{% comment %}Pastilles des séries d'un test. Paramètres : guide, series (liste de quiz.Series),
+  referential (vrai si `guide` est un référentiel).{% endcomment %}
+<ol class="series">
+  {% for s in series %}
+    <li class="series-{{ s.state }}">
+      {% if s.is_open %}
+        <a href="{% if referential %}{% url 'catalogue:referential_quiz_take' guide.slug s.number %}{% else %}{% url 'catalogue:quiz_take' guide.slug s.number %}{% endif %}"
+           title="{% if s.state == 'done' %}Série {{ s.number }} — meilleur score {{ s.best }} % (refaire){% else %}Série {{ s.number }} — à faire aujourd'hui{% endif %}">
+          <span class="series-number">{{ s.number }}</span>
+          <span class="series-label">{% if s.state == 'done' %}{{ s.best }} %{% else %}Aujourd'hui{% endif %}</span>
+        </a>
+      {% else %}
+        <span title="{% if s.unlock_on %}Série {{ s.number }} — ouverte demain{% else %}Série {{ s.number }} — verrouillée{% endif %}">
+          <span class="series-number">{{ s.number }}</span>
+          <span class="series-label">{% if s.unlock_on %}Demain{% else %}🔒{% endif %}</span>
+        </span>
+      {% endif %}
+    </li>
+  {% endfor %}
+</ol>

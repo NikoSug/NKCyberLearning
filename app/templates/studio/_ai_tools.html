@@ -1,0 +1,26 @@
+{% comment %}
+  Barre d'aide de l'IA sous un champ de texte du formulaire parent.
+  Paramètres : kind (« cours », « podcast » ou « fiche »), target (nom du champ de texte) ; facultatifs :
+  ai_category (domaine dont les guides servent de sources), ai_brief (consignes), ai_source (« guide:12 »,
+  document à résumer). Le titre et l'objectif sont lus dans les champs « title » et « objective »/« summary ».
+  Si du texte est sélectionné dans le champ, l'aide porte sur la sélection.
+{% endcomment %}
+{% if ai_enabled %}
+<div class="ai-tools" data-ai-tools data-url="{% url 'studio:ai_stream' %}" data-kind="{{ kind }}" data-target="{{ target }}"
+     data-category="{% firstof ai_category course.category.slug course.guide.category.slug series.category.slug %}"
+     data-brief="{% firstof ai_brief course.brief series.brief %}" data-source="{{ ai_source|default:'' }}">
+  <span class="ai-tools-label small">✨ IA{% if ai_busy %} <span class="muted">(indisponible)</span>{% endif %}</span>
+  {% for action, label in ai_actions %}
+    <button type="button" class="small secondary" data-ai-action="{{ action }}"{% if ai_busy %} disabled title="{{ ai_busy }}"{% endif %}>{{ label }}</button>
+  {% endfor %}
+  <div class="ai-result" data-ai-result hidden>
+    <p class="eyebrow" data-ai-title>Proposition de l'IA</p>
+    <div class="ai-output" data-ai-output aria-live="polite"></div>
+    <div class="actions">
+      <button type="button" class="small" data-ai-apply="replace">Remplacer</button>
+      <button type="button" class="small secondary" data-ai-apply="append">Ajouter à la suite</button>
+      <button type="button" class="small link" data-ai-apply="close">Fermer</button>
+    </div>
+  </div>
+</div>
+{% endif %}

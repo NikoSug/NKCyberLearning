@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}QCM — {{ draft.guide.title }} — Atelier de création — {{ instance_name }}{% endblock %}
+{% block content %}
+<p class="back-link"><a href="{{ back_url }}">← QCM des guides</a></p>
+<header class="dash-head">
+  <div>
+    <p class="eyebrow">🧠 QCM d'un guide{% if draft.author %} · par {{ draft.author.username }}{% endif %}</p>
+    <h1>{{ draft.guide.title }}</h1>
+    <p class="links small"><a href="{{ draft.guide.get_absolute_url }}">Fiche du guide</a>
+      {% if published_count %}<span class="muted">· le guide a déjà un QCM publié ({{ published_count }} questions) : il sera remplacé à la publication</span>{% endif %}</p>
+  </div>
+</header>
+
+<section class="editor-bar{% if problems and editable %} has-problems{% endif %}">
+  {% include "studio/_status.html" with code=draft.status label=draft.get_status_display hint=hint %}
+  <div class="editor-bar-actions">
+    {% if editable %}
+      <form method="post" action="{% url 'studio:qcm_action' draft.pk %}">{% csrf_token %}<input type="hidden" name="serie" value="{{ number }}">
+        <button type="submit" name="action" value="soumettre"{% if problems %} disabled title="{{ problems|join:' ; ' }}"{% endif %}>Soumettre à la relecture</button></form>
+      <form method="post" action="{% url 'studio:qcm_action' draft.pk %}" data-confirm="Faire compléter toutes les séries incomplètes par l'IA, en arrière-plan ?">{% csrf_token %}
+        <button type="submit" name="action" value="completer" class="secondary"{% if ai_busy %} disabled title="{{ ai_busy }}"{% endif %}>✨ Tout compléter par l'IA</button></form>
+      <form method="post" action="{% url 'studio:qcm_action' draft.pk %}" data-confirm="Supprimer ce QCM et toutes ses questions ?">{% csrf_token %}
+        <button type="submit" name="action" value="supprimer" class="link small">Supprimer</button></form>
+    {% elif manager and draft.status == "a_relire" %}
+      <a class="button" href="{% url 'catalogue:review_detail' draft.pk %}">Relire question par question</a>
+      <form method="post" action="{% url 'studio:qcm_action' draft.pk %}">{% csrf_token %}
+        <button type="submit" name="action" value="renvoyer" class="secondary">Renvoyer au rédacteur</button></form>
+    {% endif %}
+  </div>
+</section>
+
+<nav class="review-map" aria-label="Séries">
+  <div class="review-map-cells">
+    {% for s in series %}
+      <a href="?serie={{ s.number }}" class="review-cell wide{% if not s.complete %} flagged{% endif %}{% if s.number == number %} current{% endif %}"
+         title="Série {{ s.number }} : {{ s.count }} question(s)">Série {{ s.number }} · {{ s.count }}</a>
+    {% endfor %}
+  </div>
+</nav>
+
+<section class="card studio-block">
+  <h2>Série {{ number }} sur 6</h2>
+  <p class="muted small">Niveau attendu : {{ level }}. Au moins {{ per_series }} questions par série ; une bonne réponse et 2 à 4 mauvaises, plausibles.</p>
+  {% if editable %}
+    <form method="post" action="{% url 'studio:qcm_ai' draft.pk %}">{% csrf_token %}<input type="hidden" name="serie" value="{{ number }}">
+      <button type="submit" class="small secondary" data-busy="L'IA lit le guide et rédige… (une à deux minutes)"{% if ai_busy %} disabled title="{{ ai_busy }}"{% endif %}>✨ Proposer des questions pour cette série</button>
+    </form>
+  {% endif %}
+</section>
+
+{% for q in questions %}
+  <form method="post" action="{% url 'studio:qcm_question' draft.pk %}" id="q{{ q.pk }}" class="card review-question">{% csrf_token %}
+    <input type="hidden" name="serie" value="{{ number }}"><input type="hidden" name="question" value="{{ q.pk }}">
+    {% if q.cross_check is False %}<p class="small warn-text">⚠️ L'IA n'a pas retrouvé cette réponse dans le guide : vérifiez-la.</p>{% endif %}
+    <label>Question {{ forloop.counter }}<textarea name="text" rows="2"{% if not editable %} readonly{% endif %}>{{ q.text }}</textarea></label>
+    {% for choice in q.choices %}
+      {% if forloop.first %}<label class="answer-ok">Bonne réponse<input type="text" name="correct" value="{{ choice }}"></label>
+      {% else %}<label class="answer-ko">Mauvaise réponse<input type="text" name="wrong_{{ forloop.counter0 }}" value="{{ choice }}"></label>{% endif %}
+    {% endfor %}
+    <label>Explication<textarea name="explanation" rows="2">{{ q.explanation }}</textarea></label>
+    <label>Source dans le guide <span class="muted">(ex. R12, « Partie 3 »)</span><input type="text" name="source" value="{{ q.source }}" maxlength="120"></label>
+    {% include "catalogue/_diagram_field.html" with value=q.diagram readonly=editable|yesno:",1" %}
+    {% if editable %}
+    <div class="actions">
+      <button type="submit" name="action" value="enregistrer" class="small">Enregistrer</button>
+      <button type="submit" name="action" value="supprimer" class="small secondary" formnovalidate>Supprimer</button>
+    </div>
+    {% endif %}
+  </form>
+{% empty %}
+  <p class="empty-state">Aucune question dans cette série.</p>
+{% endfor %}
+
+{% if editable %}
+  <details class="card" id="nouvelle-question"{% if not questions %} open{% endif %}>
+    <summary><strong>+ Écrire une question</strong></summary>
+    <form method="post" action="{% url 'studio:qcm_question' draft.pk %}" class="review-question">{% csrf_token %}
+      <input type="hidden" name="serie" value="{{ number }}">
+      <label>Question<textarea name="text" rows="2" required minlength="10"></textarea></label>
+      <label class="answer-ok">Bonne réponse<input type="text" name="correct" required></label>
+      <label class="answer-ko">Mauvaise réponse<input type="text" name="wrong_1" required></label>
+      <label class="answer-ko">Mauvaise réponse<input type="text" name="wrong_2" required></label>
+      <label class="answer-ko">Mauvaise réponse <span class="muted">(facultative)</span><input type="text" name="wrong_3"></label>
+      <label>Explication<textarea name="explanation" rows="2"></textarea></label>
+      <label>Source dans le guide<input type="text" name="source" maxlength="120"></label>
+      {% include "catalogue/_diagram_field.html" with value="" %}
+      <div class="actions"><button type="submit" class="small">Ajouter la question</button></div>
+    </form>
+  </details>
+{% endif %}
+{% endblock %}

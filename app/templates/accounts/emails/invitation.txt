@@ -1,0 +1,9 @@
+{% autoescape off %}Bonjour,
+
+{% if new %}Un compte « {{ user.username }} » vient d'être créé pour vous sur {{ instance_name }}.{% else %}Voici un lien pour choisir un nouveau mot de passe pour votre compte « {{ user.username }} » sur {{ instance_name }}.{% endif %}
+Choisissez votre mot de passe en ouvrant ce lien (valable {{ days }} jours, un seul usage) :
+
+{{ link }}
+
+Si vous n'attendiez pas ce message, ignorez-le.
+{% endautoescape %}

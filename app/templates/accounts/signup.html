@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Créer un compte — {{ instance_name }}{% endblock %}
+{% block content %}
+<section class="card narrow">
+  <h1>Créer un compte</h1>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% for field in form %}
+      <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+      {{ field }}
+      {% for error in field.errors %}<p class="error">{{ error }}</p>{% endfor %}
+      {% if field.name == "password1" %}<p class="muted">12 caractères minimum, pas un mot de passe courant.</p>{% endif %}
+    {% endfor %}
+    {% for error in form.non_field_errors %}<p class="error">{{ error }}</p>{% endfor %}
+    <button type="submit">Créer mon compte</button>
+  </form>
+  <p class="muted">Déjà inscrit ? <a href="{% url 'accounts:login' %}">Se connecter</a></p>
+</section>
+{% endblock %}

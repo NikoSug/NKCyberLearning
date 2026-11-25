@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ type.new_label }} — Atelier de création — {{ instance_name }}{% endblock %}
+{% block content %}
+<p class="back-link"><a href="{{ type.list_url }}">← {{ type.plural }}</a></p>
+<header class="dash-head">
+  <div>
+    <p class="eyebrow">{{ type.icon }} {{ type.plural }}</p>
+    <h1>{{ type.new_label }}</h1>
+    <p class="muted">{{ type.description }}</p>
+  </div>
+</header>
+
+<form method="post" class="card studio-form-card">{% csrf_token %}
+  {% for title, fields in form.sections %}
+    <fieldset class="studio-section">
+      <legend>{{ title }}</legend>
+      <div class="studio-fields">{% for field in fields %}{% include "studio/_field.html" %}{% endfor %}</div>
+    </fieldset>
+  {% endfor %}
+  <fieldset class="studio-section">
+    <legend>Comment voulez-vous commencer ?</legend>
+    <div class="start-choices">
+      <button type="submit" name="mode" value="moi" class="start-choice">
+        <span class="start-choice-icon" aria-hidden="true">✍️</span>
+        <strong>Écrire moi-même</strong>
+        <span class="small">Vous ajoutez {% if type.key == "cours" %}les leçons{% else %}les épisodes{% endif %} une à une ; l'IA vous aide au fil
+          de l'écriture (brouillon, reformulation, questions, vérification).</span>
+      </button>
+      {% if ai_enabled %}<button type="submit" name="mode" value="ia" class="start-choice">
+        <span class="start-choice-icon" aria-hidden="true">✨</span>
+        <strong>Premier jet par l'IA</strong>
+        <span class="small">L'IA écrit {% if type.key == "cours" %}tout le cours (leçons, quiz, examen){% else %}toute la série{% endif %}
+          d'après vos consignes, à son tour dans les générations ; vous le retravaillez ensuite.</span>
+      </button>{% endif %}
+    </div>
+  </fieldset>
+</form>
+{% endblock %}

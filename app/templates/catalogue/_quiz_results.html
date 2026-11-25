@@ -1,0 +1,37 @@
+{% comment %}Correction détaillée d'un questionnaire. `show_guide` : rappeler le guide d'origine.{% endcomment %}
+{% load diagrams %}
+<section class="card result">
+  <div class="score-ring {% if attempt.percent >= 80 %}good{% elif attempt.percent < 50 %}bad{% endif %}">
+    <div>{{ attempt.percent }} %<small>{{ attempt.score }} / {{ attempt.total }}</small></div>
+  </div>
+  <div class="result-body">
+    <p><strong>{% if attempt.percent == 100 %}Sans faute, bravo !{% elif attempt.percent >= 80 %}Très bon résultat.{% elif attempt.percent >= 50 %}Pas mal, quelques points à revoir.{% else %}À retravailler : relisez les explications ci-dessous.{% endif %}</strong></p>
+    <p class="muted">{{ message }}</p>
+  </div>
+  {% if gain %}
+    <div class="xp-gain{% if gain.level_up %} level-up{% endif %}">
+      <span class="xp-gain-value">+{{ gain.xp }} XP{% if gain.doubled %} <small>(double XP)</small>{% endif %}</span>
+      {% if gain.emeralds %}<span class="emerald-gain">{% include "progression/_gem.html" %}+{{ gain.emeralds }} émeraude{{ gain.emeralds|pluralize }}</span>{% endif %}
+      {% if gain.level_up %}<span>Niveau {{ gain.level_after }} : {{ gain.title }} !</span>
+      {% elif not gain.xp %}<span class="muted">Déjà obtenus : réussissez de nouvelles questions pour gagner des XP.</span>{% endif %}
+    </div>
+  {% endif %}
+</section>
+
+{% for q in questions %}
+  <section class="card question {% if q.given == q.answer %}correct{% else %}wrong{% endif %}">
+    <span class="verdict">{% if q.given == q.answer %}✓ Bonne réponse{% elif q.given is None %}✕ Sans réponse{% else %}✕ Mauvaise réponse{% endif %}</span>
+    <p class="question-text"><span class="ref">{{ forloop.counter }}</span><span>{{ q.text }}</span></p>
+    {% if show_guide %}<a class="question-guide" href="{{ q.guide.get_absolute_url }}">{{ q.guide.title }}</a>{% endif %}
+    {% if q.diagram %}{{ q.diagram|diagram }}{% endif %}
+    <ul class="choices">
+      {% for choice in q.choices %}
+        <li class="{% if forloop.counter0 == q.answer %}is-answer{% elif forloop.counter0 == q.given %}is-given{% endif %}">
+          <span>{{ choice }}</span>
+          {% if forloop.counter0 == q.answer %}<span class="badge read">Bonne réponse</span>{% elif forloop.counter0 == q.given %}<span class="badge">Votre réponse</span>{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+    {% if q.explanation %}<p class="explanation">{{ q.explanation }}{% if q.source %} <span class="muted">({{ q.source }})</span>{% endif %}</p>{% endif %}
+  </section>
+{% endfor %}

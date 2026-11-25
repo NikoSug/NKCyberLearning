@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Ma progression — {{ instance_name }}{% endblock %}
+{% block content %}
+<header class="dash-head">
+  <div>
+    <p class="eyebrow">{{ active_days }} jour{% if active_days > 1 %}s{% endif %} d'apprentissage sur les 12 dernières semaines</p>
+    <h1>Ma progression</h1>
+  </div>
+  <form method="post" action="{% url 'progression:set_goal' %}" class="goal-form">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.path }}">
+    <label for="daily-goal">Objectif quotidien</label>
+    <select id="daily-goal" name="daily_goal" data-autosubmit>
+      {% for value, label in goals %}<option value="{{ value }}" {% if value == summary.goal %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <button type="submit" class="small" data-autosubmit-hide>Enregistrer</button>
+  </form>
+</header>
+
+{% include "progression/_xp_hero.html" with xp=summary %}
+
+<div class="dash-grid">
+  <section class="card">
+    <h2>Cette semaine</h2>
+    <ol class="week-bars" aria-label="XP gagnés les 7 derniers jours">
+      {% for bar in week_bars %}
+        <li class="{% if bar.xp >= summary.goal %}goal-met{% endif %}" title="{{ bar.date|date:'l j F' }} : {{ bar.xp }} XP">
+          <span class="bar-value">{{ bar.xp }}</span>
+          <span class="bar h-{{ bar.height }}"></span>
+          <span class="bar-day">{{ bar.date|date:"D"|slice:":3" }}</span>
+        </li>
+      {% endfor %}
+    </ol>
+    <p class="muted small">Les barres vertes atteignent votre objectif quotidien ({{ summary.goal }} XP).</p>
+  </section>
+
+  <section class="card">
+    <h2>Calendrier</h2>
+    <div class="heatmap" role="img" aria-label="Activité des 12 dernières semaines">
+      {% for week in weeks %}
+        <div class="heat-week">
+          {% for day in week %}<span class="heat heat-{{ day.heat }}{% if day.future %} future{% endif %}" title="{{ day.date|date:'d/m/Y' }} : {{ day.xp }} XP"></span>{% endfor %}
+        </div>
+      {% endfor %}
+    </div>
+    <p class="heat-legend muted small">Moins <span class="heat heat-0"></span><span class="heat heat-1"></span><span class="heat heat-2"></span><span class="heat heat-3"></span><span class="heat heat-4"></span> Plus</p>
+  </section>
+
+  <section class="card">
+    <h2>Niveaux</h2>
+    <ol class="levels">
+      {% for item in levels %}
+        <li class="{% if item.level < summary.level %}passed{% elif item.level == summary.level %}current{% endif %}">
+          <span class="level-badge small">{{ item.level }}</span>
+          <span class="level-name">{{ item.title }}
+            {% if item.level > 1 %}<span class="level-reward">{% include "progression/_gem.html" %}+{{ item.emeralds }}</span>{% endif %}
+            {% for rarity in item.unlocks %}<span class="pill rarity-{{ rarity.key }}">Avatars {{ rarity.label|lower }}s</span>{% endfor %}</span>
+          <span class="muted small">{{ item.start }} XP</span>
+        </li>
+      {% endfor %}
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2>Comment gagner des XP</h2>
+    <ul class="rules">
+      <li><span>Terminer la lecture d'un guide ou d'un référentiel</span><strong>10 à 60 XP</strong></li>
+      <li><span>Faire une série de test pour la première fois</span><strong>10 XP</strong></li>
+      <li><span>Réussir une question de test (la première fois)</span><strong>2 XP</strong></li>
+      <li><span>Série sans faute</span><strong>+5 XP</strong></li>
+      <li><span>Faire la révision du jour</span><strong>5 XP</strong></li>
+      <li><span>Chaque bonne réponse de la révision</span><strong>2 XP</strong></li>
+      <li><span>Révision sans faute</span><strong>+5 XP</strong></li>
+    </ul>
+    <p class="muted small">Refaire une série ne rapporte que les questions enfin réussies : on progresse en corrigeant ses erreurs.
+      La série 🔥 avance chaque jour où vous gagnez au moins 10 XP.</p>
+  </section>
+</div>
+
+<section class="card" id="emeraudes">
+  <div class="card-head">
+    <h2>Gagner des émeraudes</h2>
+    <a href="{% url 'progression:shop' %}">Boutique →</a>
+  </div>
+  <p class="muted small">Les émeraudes servent à acheter des récompenses. L'XP, lui, n'est jamais dépensé : il fait monter votre niveau, qui débloque de nouvelles récompenses.</p>
+  <ul class="rules">
+    <li><span>Atteindre un nouveau niveau</span><strong class="em">10 × le niveau</strong></li>
+    <li><span>Atteindre son objectif du jour</span><strong class="em">{{ emerald_rules.GOAL_REWARD }}</strong></li>
+    <li><span>Série de test sans faute (la première fois)</span><strong class="em">{{ emerald_rules.SERIES_PERFECT }}</strong></li>
+    <li><span>Révision du jour sans faute</span><strong class="em">{{ emerald_rules.REVIEW_PERFECT }}</strong></li>
+    <li><span>Terminer les 6 séries du test d'un guide</span><strong class="em">{{ emerald_rules.GUIDE_COMPLETED }}</strong></li>
+    {% for days, reward in streak_milestones %}<li><span>Série de {{ days }} jours 🔥</span><strong class="em">{{ reward }}</strong></li>{% endfor %}
+  </ul>
+</section>
+
+<h2 class="group-title">Derniers gains</h2>
+<section class="card">
+  {% for event in events %}
+    <div class="xp-event">
+      <span class="xp-amount">+{{ event.amount }}</span>
+      <span class="xp-label">{{ event.label }}</span>
+      <span class="muted small">{{ event.created_at|date:"d/m H:i" }}</span>
+    </div>
+  {% empty %}
+    <p class="empty-state">Aucun XP pour l'instant : terminez une lecture ou faites une série de test pour commencer.</p>
+  {% endfor %}
+</section>
+{% endblock %}

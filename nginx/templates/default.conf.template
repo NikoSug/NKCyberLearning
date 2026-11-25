@@ -1,0 +1,124 @@
+# Reverse proxy devant Django : terminaison TLS et en-têtes de sécurité.
+# Gabarit : au démarrage, l'image nginx remplace les ${VARIABLES} par les réglages de l'instance (.env) :
+#   SERVER_NAME, SSL_CERTIFICATE, SSL_CERTIFICATE_KEY, HSTS_VALUE, ADMIN_PATH, ADMIN_ALLOW_FROM.
+# (Les variables propres à nginx, sans accolades, ne sont pas touchées.)
+
+server_tokens off;
+
+# 10 requêtes/minute par IP sur les pages d'authentification ; 120/minute sur le reste du site.
+limit_req_zone $binary_remote_addr zone=auth:10m rate=10r/m;
+limit_req_zone $binary_remote_addr zone=site:10m rate=120r/m;
+limit_req_status 429;
+limit_conn_zone $binary_remote_addr zone=conn:10m;
+
+upstream django {
+    server web:8000;
+}
+
+# Nom d'hôte inconnu (balayage d'adresses IP, en-tête Host forgé) : connexion fermée sans réponse.
+server {
+    listen 8080 default_server;
+    listen [::]:8080 default_server;
+    server_name _;
+    return 444;
+}
+server {
+    listen 8443 ssl default_server;
+    listen [::]:8443 ssl default_server;
+    server_name _;
+    ssl_reject_handshake on;
+}
+
+# HTTP : défi Let's Encrypt, puis redirection systématique vers HTTPS
+server {
+    listen 8080;
+    listen [::]:8080;
+    server_name ${SERVER_NAME};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/acme;
+    }
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 8443 ssl;
+    listen [::]:8443 ssl;
+    http2 on;
+    server_name ${SERVER_NAME};
+
+    ssl_certificate     ${SSL_CERTIFICATE};
+    ssl_certificate_key ${SSL_CERTIFICATE_KEY};
+
+    # Configuration TLS conforme aux recommandations ANSSI (TLS 1.2 minimum).
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:TLS:10m;
+    ssl_session_tickets off;
+
+    # En-têtes de sécurité (HSTS : vide tant que le certificat n'est pas définitif ; nginx n'envoie pas un en-tête vide)
+    add_header Strict-Transport-Security "${HSTS_VALUE}" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "same-origin" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+    add_header Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; frame-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" always;
+
+    client_max_body_size 60m;   # téléversement des PDF de guides et des enregistrements audio
+    client_body_timeout 30s;
+    client_header_timeout 15s;
+    limit_conn conn 40;
+
+    # Ces en-têtes sont posés ici : ceux de l'application (identiques, utiles sans nginx) ne sont pas répétés.
+    proxy_hide_header Content-Security-Policy;
+    proxy_hide_header Permissions-Policy;
+    proxy_hide_header X-Content-Type-Options;
+    proxy_hide_header Referrer-Policy;
+    proxy_hide_header Strict-Transport-Security;
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_redirect off;
+
+    # Limitation de débit sur la connexion, l'inscription et le mot de passe oublié (complète django-axes).
+    location ~ ^/compte/(connexion|inscription|mot-de-passe-oublie)/ {
+        limit_req zone=auth burst=10 nodelay;
+        proxy_pass http://django;
+        proxy_read_timeout 60s;
+    }
+
+    # Administration et gestion des comptes : éventuellement réservées à un réseau (ADMIN_ALLOW_FROM).
+    location ~ ^/(${ADMIN_PATH}|compte/utilisateurs)/ {
+        allow ${ADMIN_ALLOW_FROM};
+        deny all;
+        limit_req zone=site burst=60 nodelay;
+        proxy_pass http://django;
+        proxy_read_timeout 60s;
+    }
+
+    # Assistant de lecture : réponse de l'IA envoyée au fil de l'eau (pas de mise en tampon).
+    location ~ ^/(guides/[^/]+/|assistant/)question/$ {
+        limit_req zone=site burst=20 nodelay;
+        proxy_pass http://django;
+        proxy_buffering off;
+        proxy_read_timeout 180s;
+    }
+
+    # Atelier de création : aide de l'IA (au fil de l'eau, ou rédaction qui prend une à deux minutes).
+    location ^~ /atelier/ia/ {
+        limit_req zone=site burst=20 nodelay;
+        proxy_pass http://django;
+        proxy_buffering off;
+        proxy_read_timeout 300s;
+    }
+
+    location / {
+        limit_req zone=site burst=120 nodelay;
+        proxy_pass http://django;
+        proxy_read_timeout 60s;
+    }
+}

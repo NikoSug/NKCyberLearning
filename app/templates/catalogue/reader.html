@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}{{ item.title }} — lecture — {{ instance_name }}{% endblock %}
+{% block content %}
+<div class="reader-head">
+  <div>
+    <a href="{{ back_url }}" class="muted">← Fiche</a>
+    <h1>{{ item.title }}</h1>
+  </div>
+  <div class="actions">
+    <a class="button secondary" href="{{ file_url }}" target="_blank" rel="noopener">Plein écran</a>
+    {% if item.finished_at %}
+      <span class="badge read">Lu le {{ item.finished_at|date:"d/m/Y" }}</span>
+    {% else %}
+      {% include "catalogue/_finish_button.html" with doc=item %}
+    {% endif %}
+  </div>
+</div>
+<iframe class="pdf" src="{{ file_url }}" title="{{ label }}"></iframe>
+{% include "catalogue/_source.html" %}
+{% endblock %}

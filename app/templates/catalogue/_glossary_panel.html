@@ -1,0 +1,25 @@
+{% comment %}Lexique flottant (sigles et termes des guides de la page). `glossary_entries` : entrées publiées.{% endcomment %}
+<button type="button" class="glossary-toggle" data-glossary-open aria-controls="glossary" aria-expanded="false">📖 Lexique</button>
+<aside class="assistant glossary-panel" id="glossary" data-glossary hidden aria-label="Lexique">
+  <header class="assistant-head">
+    <div>
+      <strong>Lexique</strong>
+      <p class="muted small">{{ glossary_entries|length }} sigle{{ glossary_entries|length|pluralize }} et terme{{ glossary_entries|length|pluralize }} de ce{% if glossary_scope %} {{ glossary_scope }}{% else %} guide{% endif %}</p>
+    </div>
+    <button type="button" class="icon" data-glossary-close title="Fermer" aria-label="Fermer le lexique">✕</button>
+  </header>
+  <div class="glossary-search">
+    <input type="search" placeholder="Chercher un sigle ou un mot (ex. : SI, pare-feu)" aria-label="Chercher dans le lexique" data-glossary-search>
+  </div>
+  <dl class="assistant-log glossary-list" data-glossary-list>
+    {% for entry in glossary_entries %}
+      <div class="glossary-item" data-glossary-item data-key="{{ entry.key }}" data-search="{{ entry.key }} {{ entry.term|lower }} {{ entry.expansion|lower }}">
+        <dt><strong>{{ entry.term }}</strong>{% if entry.expansion %} <span class="muted">— {{ entry.expansion }}</span>{% endif %}
+          {% if entry.kind == "sigle" %}<span class="chip">sigle</span>{% endif %}</dt>
+        <dd>{{ entry.definition }}</dd>
+      </div>
+    {% endfor %}
+    <p class="muted small" data-glossary-empty hidden>Aucun terme ne correspond. Essayez l'assistant (« 💬 Une question ? »).</p>
+  </dl>
+  <p class="assistant-note muted small">Définitions rédigées par une IA à partir des guides, puis relues. <a href="{% url 'catalogue:glossary_index' %}">Tout le lexique</a></p>
+</aside>

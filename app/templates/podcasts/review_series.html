@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}{% if writing %}Rédaction{% else %}Relecture{% endif %} — {{ series.title }} — {{ instance_name }}{% endblock %}
+{% block content %}
+<p class="back-link"><a href="{{ back_url }}">← {{ back_label }}</a></p>
+<header class="dash-head">
+  <div>
+    <p class="eyebrow">🎙️ Podcast · {{ series.category.name }}{% if series.author %} · par {{ series.author.username }}{% elif series.llm_model %} · généré par {{ series.llm_model }}{% endif %}</p>
+    <h1>{{ series.title }}</h1>
+    {% if series.summary %}<p class="muted">{{ series.summary }}</p>{% endif %}
+    {% if series.brief %}<p class="muted small">🎯 Consignes : {{ series.brief|truncatechars:240 }}</p>{% endif %}
+  </div>
+</header>
+
+<section class="editor-bar{% if problems and editable %} has-problems{% endif %}">
+  {% include "studio/_status.html" with code=series.status label=series.get_status_display hint=hint %}
+  <div class="editor-bar-actions">
+    {% if editable %}
+      {% if writing and not manager %}
+        <form method="post" action="{% url 'podcasts:review_series_action' series.pk %}">{% csrf_token %}
+          <input type="hidden" name="action" value="soumettre"><input type="hidden" name="episode" value="{{ episode.position }}">
+          <button type="submit"{% if problems %} disabled title="{{ problems|join:' ; ' }}"{% endif %}>Soumettre à la relecture</button></form>
+      {% endif %}
+      {% if manager and series.status == "publie" %}
+        <form method="post" action="{% url 'podcasts:review_series_action' series.pk %}">{% csrf_token %}
+          <input type="hidden" name="action" value="reenregistrer"><input type="hidden" name="episode" value="{{ episode.position }}">
+          <button type="submit"{% if not to_rerecord %} disabled title="Aucun épisode modifié"{% endif %}>🎙️ Réenregistrer{% if to_rerecord %} ({{ to_rerecord }}){% endif %}</button></form>
+        <a class="button secondary" href="{{ series.get_absolute_url }}">Écouter la série ↗</a>
+      {% elif manager %}
+        <form method="post" action="{% url 'podcasts:review_series_action' series.pk %}">{% csrf_token %}
+          <input type="hidden" name="action" value="valider"><input type="hidden" name="episode" value="{{ episode.position }}">
+          <button type="submit"{% if problems %} disabled title="{{ problems|join:' ; ' }}"{% endif %}>Valider et enregistrer</button></form>
+      {% endif %}
+      {% if not writing and manager and series.author %}
+        <form method="post" action="{% url 'podcasts:review_series_action' series.pk %}">{% csrf_token %}
+          <input type="hidden" name="action" value="renvoyer"><button type="submit" class="secondary">Renvoyer au rédacteur</button></form>
+      {% endif %}
+      {% if series.status != "publie" and ai_enabled %}
+      <form method="post" action="{% url 'podcasts:review_series_action' series.pk %}" data-confirm="Faire réécrire entièrement cette série par l'IA ? Les épisodes actuels seront perdus.">{% csrf_token %}
+        <input type="hidden" name="action" value="relancer"><button type="submit" class="secondary">✨ Réécrire avec l'IA</button></form>
+      {% endif %}
+      {% if writing %}
+        <form method="post" action="{% url 'podcasts:review_series_action' series.pk %}" data-confirm="Supprimer définitivement cette série et ses épisodes ?">{% csrf_token %}
+          <input type="hidden" name="action" value="supprimer"><button type="submit" class="link small">Supprimer</button></form>
+      {% elif manager and series.status == "a_relire" %}
+        <form method="post" action="{% url 'podcasts:review_series_action' series.pk %}" data-confirm="Abandonner cette série ?">{% csrf_token %}
+          <input type="hidden" name="action" value="abandonner"><button type="submit" class="link small">Abandonner</button></form>
+      {% endif %}
+    {% elif series.status == "publie" %}
+      <a class="button secondary" href="{{ series.get_absolute_url }}">Écouter la série publiée ↗</a>
+    {% endif %}
+  </div>
+</section>
+
+{% if editable %}
+<details class="card course-meta-edit"{% if not episodes %} open{% endif %}>
+  <summary><strong>Titre, présentation{% if series.author %} et consignes{% endif %} de la série</strong></summary>
+  <form method="post" action="{% url 'podcasts:review_series_action' series.pk %}" class="review-question">{% csrf_token %}
+    <input type="hidden" name="action" value="enregistrer"><input type="hidden" name="episode" value="{{ episode.position }}">
+    <label>Titre<input type="text" name="title" value="{{ series.title }}" maxlength="200"></label>
+    <label>Présentation<textarea name="summary" rows="2">{{ series.summary }}</textarea></label>
+    {% if series.author %}<label>Consignes pour l'IA <span class="muted">(de quoi parle la série ; utilisées par chaque aide)</span><textarea name="brief" rows="3">{{ series.brief }}</textarea></label>{% endif %}
+    <div class="actions"><button type="submit" class="small">Enregistrer</button></div>
+  </form>
+</details>
+{% endif %}
+
+<nav class="review-map" aria-label="Épisodes de la série">
+  <div class="review-map-cells">
+    {% for e in episodes %}
+      <a href="?episode={{ e.position }}" class="review-cell wide{% if e.problems or e.flags %} flagged{% endif %}{% if e.pk == episode.pk %} current{% endif %}"
+         title="Épisode {{ e.position }} : {{ e.title }} ({{ e.words }} mots{% if e.flags %}, {{ e.flags|length }} à vérifier{% endif %})">Épisode {{ e.position }}{% if e.flags %} · {{ e.flags|length }}{% endif %}</a>
+    {% endfor %}
+    {% if editable %}
+      <form method="post" action="{% url 'podcasts:review_series_action' series.pk %}" class="inline">{% csrf_token %}
+        <input type="hidden" name="action" value="ajouter-episode"><button type="submit" class="review-cell wide add-cell" title="Ajouter un épisode à la fin">+ Épisode</button>
+      </form>
+    {% endif %}
+  </div>
+</nav>
+
+{% if episode %}
+<div class="review-split">
+  <section class="card">
+    <p class="eyebrow">Épisode {{ episode.position }} sur {{ episodes|length }} · {{ episode.script|length }} répliques · {{ episode.words }} mots (≈ {% widthratio episode.words 150 1 %} min)</p>
+    <h2>{{ episode.title }}</h2>
+    {% if episode.summary %}<p class="lesson-objective">🎧 {{ episode.summary }}</p>{% endif %}
+    {% if episode.flags %}<p class="small warn-text">⚠️ {{ episode.flags|length }} réplique{{ episode.flags|length|pluralize }} à vérifier : la vérification par l'IA n'y retrouve pas les guides. Corrigez-les ou supprimez-les ; enregistrer l'épisode efface ces remarques.</p>{% endif %}
+    {% if episode.script %}
+      <div class="dialogue">
+        {% for line in episode.lines %}<p{% if line.flag %} class="line-flagged"{% endif %}><strong class="host host-{{ line.speaker }}">{{ line.host }}</strong> {{ line.text }}{% if line.flag %}<span class="flag-reason">⚠️ {{ line.flag }}</span>{% endif %}</p>{% endfor %}
+      </div>
+    {% else %}
+      <p class="empty-state">Épisode vide : écrivez le dialogue à droite, ou cliquez sur « Rédiger un brouillon » pour que l'IA en propose un.</p>
+    {% endif %}
+    <p class="muted small">Guides utilisés : {{ episode.sources|default:"—" }}</p>
+    {% if editable and episode.script %}
+      <form method="post" action="{% url 'studio:ai_check_episode' episode.pk %}">{% csrf_token %}
+        <button type="submit" class="small secondary" data-busy="L'IA vérifie l'épisode… (jusqu'à une minute)"{% if ai_busy %} disabled title="{{ ai_busy }}"{% endif %}>✨ Vérifier la fidélité aux guides</button>
+      </form>
+    {% endif %}
+  </section>
+  {% if editable %}
+  <form method="post" action="{% url 'podcasts:review_episode' episode.pk %}" class="card review-question">{% csrf_token %}
+    <p class="eyebrow">Modifier l'épisode</p>
+    <label>Titre<input type="text" name="title" value="{{ episode.title }}" maxlength="200"></label>
+    <label>Résumé<input type="text" name="summary" value="{{ episode.summary }}" maxlength="400"></label>
+    <label>Script <span class="muted">(une réplique par paragraphe, « {{ hosts.0 }} : … » ou « {{ hosts.1 }} : … » ; au moins {{ min_turns }} répliques et {{ min_words }} mots)</span>
+      <textarea name="body" rows="22">{{ script }}</textarea></label>
+    {% include "studio/_ai_tools.html" with kind="podcast" target="body" %}
+    <div class="actions">
+      <button type="submit" class="small">Enregistrer l'épisode</button>
+      {% if ai_enabled %}<button type="submit" name="action" value="reecrire" class="small secondary" formnovalidate
+              data-confirm="Faire réécrire cet épisode par l'IA ? Vos corrections de cet épisode seront perdues.">Faire réécrire par l'IA</button>{% endif %}
+      <button type="submit" name="action" value="supprimer" class="small link" formnovalidate
+              data-confirm="Supprimer l'épisode « {{ episode.title }} » ?">Supprimer l'épisode</button>
+    </div>
+  </form>
+  {% endif %}
+</div>
+
+<nav class="review-steps" aria-label="Navigation entre les épisodes">
+  {% if previous %}<a class="button secondary" href="?episode={{ previous.position }}" data-shortcut="arrowleft">← Épisode {{ previous.position }}</a>{% else %}<span></span>{% endif %}
+  {% if next %}<a class="button secondary" href="?episode={{ next.position }}" data-shortcut="arrowright">Épisode {{ next.position }} →</a>{% else %}<span></span>{% endif %}
+</nav>
+{% else %}
+  <p class="empty-state">Aucun épisode pour l'instant{% if editable %} : cliquez sur « + Épisode » pour commencer{% endif %}.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% load search_text %}
+{% block title %}{% if query %}{{ query }} — {% endif %}Recherche — {{ instance_name }}{% endblock %}
+{% block content %}
+<header class="dash-head">
+  <div>
+    <p class="eyebrow">Tout le site</p>
+    <h1>Recherche</h1>
+  </div>
+</header>
+<form method="get" class="search-form" role="search">
+  <div class="search-big">
+    <input type="search" name="q" value="{{ query }}" placeholder="Ex. : Active Directory, EDR, sauvegarde, SecNumCloud, CISSP…" aria-label="Recherche" autofocus>
+    <button type="submit">Rechercher</button>
+  </div>
+  <div class="filters search-filters">
+    <select name="domaine" aria-label="Domaine" data-autosubmit>
+      <option value="">Tous les domaines</option>
+      {% for c in categories %}<option value="{{ c.slug }}" {% if c.slug == filters.domaine %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+    </select>
+    <select name="niveau" aria-label="Niveau" data-autosubmit>
+      <option value="">Tous les niveaux</option>
+      {% for value, label in levels %}<option value="{{ value }}" {% if value == filters.niveau %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <select name="format" aria-label="Format" data-autosubmit>
+      <option value="">Tous les formats</option>
+      {% for value, label in formats %}<option value="{{ value }}" {% if value == filters.format %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    {% if tab != "tout" %}<input type="hidden" name="type" value="{{ tab }}">{% endif %}
+    {% if filters.domaine or filters.niveau or filters.format %}<a class="reset" href="?q={{ query|urlencode }}">Effacer les filtres</a>{% endif %}
+  </div>
+</form>
+
+{% if words %}
+  <nav class="tabs" aria-label="Type de résultat">
+    {% for value, label in tabs %}
+      {% for key, n in counts.items %}{% if key == value %}
+        {% if n or value == "tout" or value == tab %}
+          <a href="?q={{ query|urlencode }}&amp;type={{ value }}{% if filters.domaine %}&amp;domaine={{ filters.domaine }}{% endif %}{% if filters.niveau %}&amp;niveau={{ filters.niveau }}{% endif %}{% if filters.format %}&amp;format={{ filters.format }}{% endif %}"
+             {% if value == tab %}aria-current="page"{% endif %}>{{ label }} <span class="count">{{ n }}</span></a>
+        {% endif %}
+      {% endif %}{% endfor %}
+    {% endfor %}
+  </nav>
+
+  {% if not total %}
+    <p class="empty-state">Aucun résultat pour « {{ query }} »{% if filters.domaine or filters.niveau or filters.format %} avec ces filtres{% endif %}.</p>
+  {% endif %}
+
+  {% for key, items in results.items %}{% if items %}
+    <section class="search-group">
+      {% for value, label in tabs %}{% if value == key %}
+        <h2 class="group-title">{{ label }} <span class="count">{% for k, n in counts.items %}{% if k == key %}{{ n }}{% endif %}{% endfor %}</span></h2>
+      {% endif %}{% endfor %}
+
+      {% if key == "guides" %}
+        {% for guide in items %}{% include "catalogue/_guide_item.html" %}{% endfor %}
+      {% elif key == "lexique" %}
+        {% for item in items %}
+          <div class="item search-term">
+            <div class="item-body">
+              <span class="item-title">{{ item.entry.term|highlight:words }}{% if item.entry.expansion %} <span class="muted">— {{ item.entry.expansion|highlight:words }}</span>{% endif %}</span>
+              <p class="small">{{ item.entry.definition|highlight:words }}</p>
+              <p class="meta"><span class="chip">{{ item.entry.get_kind_display }}</span>
+                {% for g in item.guides|slice:":3" %}<a href="{{ g.get_absolute_url }}">{{ g.title|truncatechars:50 }}</a>{% endfor %}
+                {% if item.guides|length > 3 %}<span>+ {{ item.guides|length|add:-3 }} guide{{ item.guides|length|add:-3|pluralize }}</span>{% endif %}</p>
+            </div>
+          </div>
+        {% endfor %}
+      {% elif key == "referentiels" %}
+        {% for r in items %}
+          <div class="item">
+            <div class="item-body">
+              <a href="{{ r.get_absolute_url }}" class="item-title">{{ r.title|highlight:words }}</a>
+              <p class="meta"><span>{{ r.get_kind_display }}</span>{% if r.version %}<span>{{ r.version_display }}</span>{% endif %}{% if r.document %}<span>{{ r.duration_display }}</span>{% endif %}</p>
+            </div>
+            {% if r.document %}{% include "catalogue/_add_button.html" with doc=r kind="referentiel" %}{% endif %}
+          </div>
+        {% endfor %}
+      {% elif key == "certifications" %}
+        {% for c in items %}
+          <div class="item">
+            <div class="item-body">
+              <a href="{{ c.get_absolute_url }}" class="item-title">{{ c.name|highlight:words }}{% if c.acronym %} ({{ c.acronym|highlight:words }}){% endif %}</a>
+              <p class="meta">{% if c.level %}<span class="level level-{{ c.level }}">{{ c.get_level_display }}</span>{% endif %}<span>{{ c.get_kind_display }}</span>{% if c.issuer %}<span>{{ c.issuer }}</span>{% endif %}</p>
+            </div>
+          </div>
+        {% endfor %}
+      {% else %}
+        {% for hit in items %}
+          <div class="item search-hit">
+            <div class="item-body">
+              <a href="{{ hit.url }}" class="item-title">{% if hit.kind == "cours" %}🎓 {% elif hit.kind == "podcast" %}🎙️ {% elif hit.kind == "texte" %}📄 {% endif %}{{ hit.title|highlight:words }}</a>
+              {% if hit.meta %}<p class="meta">{% for m in hit.meta %}<span>{{ m|highlight:words }}</span>{% endfor %}</p>{% endif %}
+              {% if hit.excerpt %}<p class="search-excerpt small">{{ hit.excerpt|highlight:words }}</p>{% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      {% endif %}
+
+      {% if tab == "tout" %}{% for k, n in counts.items %}{% if k == key and n > limit %}
+        <p class="search-more"><a href="?q={{ query|urlencode }}&amp;type={{ key }}{% if filters.domaine %}&amp;domaine={{ filters.domaine }}{% endif %}{% if filters.niveau %}&amp;niveau={{ filters.niveau }}{% endif %}{% if filters.format %}&amp;format={{ filters.format }}{% endif %}">Voir les {{ n }} résultats →</a></p>
+      {% endif %}{% endfor %}{% endif %}
+    </section>
+  {% endif %}{% endfor %}
+{% else %}
+  <p class="muted">Cherchez un sujet, un sigle, un guide, un cours, un podcast, une certification ou un référentiel. La recherche porte aussi
+    sur le texte complet des guides. Ajoutez ce qui vous intéresse à votre lecture avec le bouton <span class="add-sample">+</span>.</p>
+{% endif %}
+{% endblock %}

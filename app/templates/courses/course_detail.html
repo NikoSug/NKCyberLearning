@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}{{ course.title }} — {{ instance_name }}{% endblock %}
+{% block content %}
+<p class="back-link"><a href="{% url 'courses:course_list' %}">← Cours</a></p>
+<header class="dash-head">
+  <div>
+    <p class="eyebrow">{{ course.get_kind_display }} · {{ course.get_level_display }} · {{ lessons|length }} leçon{{ lessons|length|pluralize }}</p>
+    <h1>{{ course.title }}</h1>
+    {% if course.summary %}<p class="muted">{{ course.summary }}</p>{% endif %}
+    <p class="links small">
+      {% if course.guide %}D'après le guide <a href="{{ course.guide.get_absolute_url }}">{{ course.guide.title }}</a>
+      {% elif course.category %}D'après les guides du thème <a href="{% url 'catalogue:path_detail' course.category.slug %}">{{ course.category.name }}</a>{% endif %}
+    </p>
+  </div>
+  {% if next_lesson %}<a class="button" href="{{ next_lesson.get_absolute_url }}">{% if next_lesson.position == 1 and next_lesson.best is None %}Commencer{% else %}Continuer{% endif %} : leçon {{ next_lesson.position }}</a>{% endif %}
+</header>
+
+<ol class="lesson-path">
+  {% for lesson in lessons %}
+    <li class="lesson-step {{ lesson.state }}">
+      <span class="lesson-mark" aria-hidden="true">{% if lesson.state == "done" %}✓{% elif lesson.state == "locked" %}🔒{% else %}{{ lesson.position }}{% endif %}</span>
+      <div class="lesson-info">
+        {% if lesson.state == "locked" %}<span class="lesson-name">{{ lesson.title }}</span>
+        {% else %}<a class="lesson-name" href="{{ lesson.get_absolute_url }}">{{ lesson.title }}</a>{% endif %}
+        <span class="muted small">{{ lesson.objective|default:"" }}</span>
+      </div>
+      <span class="small lesson-status">
+        {% if lesson.state == "done" %}<span class="ok-text">Réussie · {{ lesson.best }} %</span>
+        {% elif lesson.state == "open" %}{% if lesson.best is not None %}Meilleur score : {{ lesson.best }} %{% else %}~ {{ lesson.minutes }} min{% endif %}
+        {% else %}<span class="muted">Verrouillée</span>{% endif %}
+      </span>
+    </li>
+  {% endfor %}
+  <li class="lesson-step exam {% if best_exam.passed %}done{% elif exam_open %}open{% else %}locked{% endif %}">
+    <span class="lesson-mark" aria-hidden="true">{% if best_exam.passed %}🏆{% elif exam_open %}🎯{% else %}🔒{% endif %}</span>
+    <div class="lesson-info">
+      {% if exam_open %}<a class="lesson-name" href="{% url 'courses:exam' course.slug %}">Examen final</a>{% else %}<span class="lesson-name">Examen final</span>{% endif %}
+      <span class="muted small">{{ exam_count }} questions sur tout le cours · réussi à partir de {{ pass.exam }} %</span>
+    </div>
+    <span class="small lesson-status">
+      {% if best_exam %}{% if best_exam.passed %}<span class="ok-text">Réussi · {{ best_exam.percent }} %</span>{% else %}Meilleur score : {{ best_exam.percent }} %{% endif %}
+      {% elif not exam_open %}<span class="muted">Après toutes les leçons</span>{% endif %}
+    </span>
+  </li>
+</ol>
+<p class="muted small">Chaque quiz de leçon est réussi à partir de {{ pass.lesson }} % de bonnes réponses ; vous pouvez le refaire autant que vous voulez.
+  {% if course.author %}Ce cours a été rédigé par {{ course.author.username }}{% else %}Ce cours a été rédigé par une IA{% endif %} à partir des guides de l'ANSSI
+  (réutilisés sous <a href="https://www.etalab.gouv.fr/licence-ouverte-open-licence/" target="_blank" rel="noopener noreferrer">Licence Ouverte v2.0</a>), puis relu ; les guides font foi. L'ANSSI n'a pas validé ce contenu.</p>
+{% if course.guide %}{% include "catalogue/_source.html" with item=course.guide derived=True %}{% endif %}
+{% endblock %}

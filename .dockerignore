@@ -1,0 +1,26 @@
+# Rien de sensible ni d'inutile dans l'image
+.git
+.github
+.env
+.env.*
+nginx
+backups
+docs
+**/__pycache__
+**/*.pyc
+app/media
+app/staticfiles
+*.md
+docker-compose*.yml
+.venv
+venv
+
+# Clés, caches et fichiers locaux du poste
+*.key
+*.pem
+.backup-key
+packs
+app/.cache
+.ia-agent.*
+.claude
+requirements*.in

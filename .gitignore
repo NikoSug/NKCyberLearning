@@ -1,0 +1,50 @@
+# Secrets — ne JAMAIS commiter
+.env
+.env.*
+!.env.example
+nginx/certs/*
+!nginx/certs/.gitkeep
+*.pem
+*.key
+
+# Données
+backups/
+app/media/
+app/staticfiles/
+*.sqlite3
+*.dump
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Agent du poste (scripts/ia-agent.ps1)
+.ia-agent.pid
+.ia-agent.log
+
+# Éditeurs / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Réglages locaux d'outils
+.claude/settings.local.json
+
+# Clé de chiffrement des sauvegardes (scripts/backup.sh) : à conserver aussi hors de la machine
+.backup-key
+
+# Packs de contenus produits par scripts/publier-contenus.sh (plusieurs Go) ; clé privée de signature
+packs/
+contenus-signature.key
+
+# Liste des fichiers de la version installée depuis une archive (scripts/deploy.sh)
+.fichiers-version
+
+# Cache local des outils (généré par l'app en dev)
+app/.cache/

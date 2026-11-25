@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Relecture — {{ instance_name }}{% endblock %}
+{% block content %}
+<header class="dash-head">
+  <div>
+    <p class="eyebrow">Contenus générés par l'IA locale · modèle {{ model }}</p>
+    <h1>Relecture</h1>
+    <p class="muted">QCM, cours, podcasts et lexiques restent invisibles des apprenants tant qu'ils ne sont pas relus et publiés.</p>
+    <p class="links small"><a href="{% url 'catalogue:generation_dashboard' %}">📊 Générations</a> · <a href="{% url 'studio:home' %}">🖋️ Atelier de création</a>
+      (contributions des rédacteurs : guides, référentiels, certifications, parcours, audio)</p>
+  </div>
+  {% if kind != "tout" %}
+  <div class="head-actions">{% include "catalogue/_generation_queue.html" %}</div>
+  {% endif %}
+</header>
+
+<nav class="tabs" aria-label="Type de contenu">
+  {% for value, label in types %}
+    <a href="?type={{ value }}"{% if value == kind %} aria-current="page"{% endif %}>{{ label }}{% for k, n in counts.items %}{% if k == value and n %} <span class="pill warn">{{ n }}</span>{% endif %}{% endfor %}</a>
+  {% endfor %}
+</nav>
+
+<h2 class="group-title">À relire <span class="count">{{ to_review|length }}</span></h2>
+{% for row in to_review %}
+  <a class="item review-row" href="{{ row.url }}">
+    <div class="item-body">
+      <span class="item-title">{% if kind == "tout" %}<span class="chip">{{ row.label }}</span> {% endif %}{{ row.title }}</span>
+      <p class="meta"><span>{{ row.detail }}</span>
+        {% if row.flag %}<span class="pill warn">{{ row.flag }} à vérifier</span>{% endif %}
+        <span>généré le {{ row.when|date:"d/m H:i" }}</span></p>
+    </div>
+    <span class="button small">Relire</span>
+  </a>
+{% empty %}
+  <p class="empty-state">Rien à relire pour l'instant.</p>
+{% endfor %}
+
+{% if in_progress %}
+  <h2 class="group-title">En file ou en génération <span class="count">{{ in_progress|length }}</span></h2>
+  <section class="card" data-auto-refresh="30">
+    <p class="muted small">Suivi détaillé et pause : <a href="{% url 'catalogue:generation_dashboard' %}">tableau de bord des générations</a>. Cette page se met à jour toute seule.</p>
+    {% for row in in_progress %}
+      <div class="person">
+        <div class="person-body"><strong>{{ row.title }}</strong>
+          {% if row.status == "generation" or row.status == "enregistrement" %}{% include "catalogue/_job_progress.html" with job=row.job %}
+          {% elif row.progress %}<span class="muted small">{{ row.progress }}</span>{% endif %}</div>
+        {% include "catalogue/_job_status.html" with status=row.status %}
+      </div>
+    {% endfor %}
+  </section>
+{% endif %}
+
+{% if failed %}
+  <h2 class="group-title">Échecs <span class="count">{{ failed|length }}</span></h2>
+  <section class="card">
+    {% for row in failed %}
+      <div class="person">
+        <div class="person-body"><strong>{{ row.title }}</strong><span class="error small">{{ row.error|truncatechars:160 }}</span></div>
+        {% include "catalogue/_job_status.html" with status=row.status %}
+        {% if ai_enabled %}<form method="post" action="{{ row.retry_url }}" class="inline">
+          {% csrf_token %}<input type="hidden" name="action" value="relancer"><button type="submit" class="small secondary">Relancer</button>
+        </form>{% endif %}
+      </div>
+    {% endfor %}
+  </section>
+{% endif %}
+
+{% if published %}
+  <h2 class="group-title">Publiés récemment</h2>
+  <section class="card">
+    {% for row in published %}
+      <div class="person"><div class="person-body"><a href="{{ row.url }}">{{ row.title }}</a>
+        <span class="muted small">le {{ row.published_at|date:"d/m/Y" }}</span></div>
+        {% include "catalogue/_job_status.html" with status=row.status %}</div>
+    {% endfor %}
+  </section>
+{% endif %}
+{% endblock %}

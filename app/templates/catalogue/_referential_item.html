@@ -1,0 +1,11 @@
+<div class="item">
+  <div class="item-body">
+    <a href="{{ r.get_absolute_url }}" class="item-title">{{ r.title }}</a>
+    <p class="meta">
+      {% if r.version %}<span>{{ r.version_display }}</span>{% endif %}
+      {% if r.total %}<span>Grille : {{ r.done }} / {{ r.total }} ({{ r.progress }} %)</span>{% endif %}
+      {% if r.document %}<span>{{ r.duration_display }}</span>{% endif %}
+    </p>
+  </div>
+  {% if r.document %}{% include "catalogue/_add_button.html" with doc=r kind="referentiel" %}{% endif %}
+</div>

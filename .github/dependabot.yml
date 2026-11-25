@@ -1,0 +1,16 @@
+# Propose automatiquement les mises à jour de sécurité des dépendances, sur la branche de développement (dev) :
+# elles arrivent sur main avec la version suivante, après les tests.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    target-branch: dev
+    schedule: { interval: weekly }
+  - package-ecosystem: docker
+    directory: /
+    target-branch: dev
+    schedule: { interval: weekly }
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: dev
+    schedule: { interval: monthly }

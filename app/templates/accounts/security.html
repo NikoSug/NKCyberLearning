@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Sécurité du compte — {{ instance_name }}{% endblock %}
+{% block content %}
+<header class="dash-head">
+  <div>
+    <p class="eyebrow">Mon compte</p>
+    <h1>Sécurité et données</h1>
+  </div>
+</header>
+
+<section class="card">
+  <h2>Double authentification</h2>
+  {% if device %}
+    <p><span class="pill ok">Activée</span> depuis le {{ device.confirmed_at|date:"j F Y" }} ·
+       {{ recovery_left }} code{{ recovery_left|pluralize }} de secours restant{{ recovery_left|pluralize }}.</p>
+    <details>
+      <summary>Régénérer les codes de secours</summary>
+      <form method="post" action="{% url 'accounts:two_factor_codes' %}" class="inline-form">{% csrf_token %}
+        <label>Code de l'application{{ code_form.code }}</label>
+        <button type="submit" class="secondary">Générer de nouveaux codes</button>
+      </form>
+    </details>
+    {% if not required %}
+    <details>
+      <summary>Désactiver</summary>
+      <form method="post" action="{% url 'accounts:two_factor_disable' %}" class="inline-form">{% csrf_token %}
+        <label>Mot de passe{{ disable_form.password }}</label>
+        <label>Code de l'application{{ disable_form.code }}</label>
+        <button type="submit" class="secondary">Désactiver la double authentification</button>
+      </form>
+    </details>
+    {% else %}<p class="small muted">Obligatoire pour votre rôle.</p>{% endif %}
+  {% else %}
+    <p>Un code de votre téléphone est demandé en plus du mot de passe : un mot de passe volé ne suffit plus.</p>
+    <a class="button" href="{% url 'accounts:two_factor_setup' %}">Activer</a>
+  {% endif %}
+</section>
+
+<section class="card" id="vacances">
+  <h2>🏖️ Mode vacances</h2>
+  {% if vacation %}
+    <p><span class="pill ok">Activé</span> jusqu'au <strong>{{ vacation.end|date:"l j F Y" }}</strong> : aucune lecture
+      n'est prévue et votre série de jours est protégée. Apprendre quand même la prolonge.</p>
+    <form method="post" action="{% url 'accounts:vacation' %}" class="inline-form">{% csrf_token %}
+      <button type="submit" name="action" value="retour" class="secondary">Je suis de retour</button>
+    </form>
+    <details>
+      <summary>Changer la date de retour</summary>
+      <form method="post" action="{% url 'accounts:vacation' %}" class="inline-form">{% csrf_token %}
+        <label>{{ vacation_form.end.label }}<input type="date" name="end" value="{{ vacation.end|date:'Y-m-d' }}"
+          min="{% now 'Y-m-d' %}" max="{{ vacation_max|date:'Y-m-d' }}" required></label>
+        <button type="submit" class="secondary">Mettre à jour</button>
+      </form>
+    </details>
+  {% else %}
+    <p>Pendant vos congés, aucune lecture n'est planifiée, votre série de jours ne peut pas se casser et aucun gel
+      n'est utilisé. Votre planning reprend automatiquement à votre retour.</p>
+    <form method="post" action="{% url 'accounts:vacation' %}" class="inline-form">{% csrf_token %}
+      <label>{{ vacation_form.end.label }}<input type="date" name="end" min="{% now 'Y-m-d' %}"
+        max="{{ vacation_max|date:'Y-m-d' }}" required></label>
+      <button type="submit">Activer le mode vacances</button>
+    </form>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>Mot de passe</h2>
+  <p><a href="{% url 'accounts:password_change' %}">Changer de mot de passe</a></p>
+</section>
+
+<section class="card">
+  <h2>Activité récente</h2>
+  <ul class="plain-list">
+    {% for event in events %}
+      <li><span class="{% if 'echec' in event.action %}warn-text{% endif %}">{{ event.label }}</span>
+        <span class="muted small">· {{ event.at|date:"j F Y, H:i" }}{% if event.ip %} · {{ event.ip }}{% endif %}</span></li>
+    {% empty %}<li class="muted">Aucune activité enregistrée.</li>{% endfor %}
+  </ul>
+  <p class="small muted">Une connexion que vous ne reconnaissez pas ? Changez votre mot de passe et prévenez un administrateur.</p>
+</section>
+
+<section class="card">
+  <h2>Mes données</h2>
+  <p>Téléchargez tout ce que la plateforme conserve sur vous (lectures, tests, progression, amis, questions à l'assistant…).</p>
+  <form method="post" action="{% url 'accounts:export_data' %}">{% csrf_token %}<button type="submit" class="secondary">Télécharger mes données (JSON)</button></form>
+  {% if can_delete %}
+  <details class="danger-zone">
+    <summary>Supprimer mon compte</summary>
+    <p class="small">Suppression définitive du compte et de toutes ses données. Cette action est irréversible.</p>
+    <form method="post" action="{% url 'accounts:delete_account' %}" class="inline-form">{% csrf_token %}
+      <label>{{ delete_form.password.label }}{{ delete_form.password }}</label>
+      <label>{{ delete_form.confirm.label }}{{ delete_form.confirm }}</label>
+      <button type="submit" class="danger" data-confirm="Supprimer définitivement votre compte ?">Supprimer mon compte</button>
+    </form>
+  </details>
+  {% else %}<p class="small muted">Un compte à droits élevés est supprimé par un administrateur.</p>{% endif %}
+</section>
+{% endblock %}

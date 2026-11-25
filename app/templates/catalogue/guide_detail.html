@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}{{ guide.title }} — {{ instance_name }}{% endblock %}
+{% block content %}
+<p class="back-link"><a href="{% url 'catalogue:guide_list' %}">← Guides</a></p>
+<article class="card fiche">
+  {% if guide.cover %}
+    <img class="cover" src="{% url 'catalogue:guide_cover' guide.slug %}" alt="" width="311" height="150">
+  {% endif %}
+  <div>
+    <p class="eyebrow">{{ guide.category.name|default:"Guide ANSSI" }}</p>
+    <h1>{{ guide.title }}</h1>
+    <dl class="facts">
+      <div><dt>Niveau</dt><dd><span class="level level-{{ guide.level }}">{{ guide.get_level_display }}</span></dd></div>
+      <div><dt>Lecture</dt><dd>~ {{ guide.duration_display }}</dd></div>
+      <div><dt>Test</dt><dd>{% if guide.quiz_series %}<a href="#test">QCM · {{ guide.quiz_series }} série{{ guide.quiz_series|pluralize }}</a>{% else %}<span class="muted">Aucun questionnaire</span>{% endif %}</dd></div>
+      {% if guide.page_count %}<div><dt>Pages</dt><dd>{{ guide.page_count }}</dd></div>{% endif %}
+      {% if guide.published_on %}<div><dt>Mis à jour</dt><dd>{{ guide.published_on|date:"m/Y" }}</dd></div>{% endif %}
+      {% if guide.language != "fr" %}<div><dt>Langue</dt><dd>{{ guide.get_language_display }}</dd></div>{% endif %}
+    </dl>
+    <div class="actions">
+      {% with first=documents.0 %}
+        {% if first.file %}<a class="button" href="{% url 'catalogue:guide_read' guide.slug first.pk %}">Lire le guide</a>
+        {% elif first.source_url %}<a class="button" href="{{ first.source_url }}" target="_blank" rel="noopener noreferrer">Ouvrir sur le site de l'ANSSI</a>{% endif %}
+      {% endwith %}
+      {% if documents %}<a class="button secondary" href="{% url 'catalogue:guide_listen' guide.slug %}">🎧 Écouter</a>{% endif %}
+      {% if guide.finished_at %}
+        <span class="badge read">Lu le {{ guide.finished_at|date:"d/m/Y" }}</span>
+      {% elif guide.in_list %}
+        <span class="badge listed">Dans ma lecture</span>
+        {% include "catalogue/_finish_button.html" with doc=guide kind="guide" %}
+      {% else %}
+        <form method="post" action="{% url 'catalogue:reading_add' %}" class="inline">
+          {% csrf_token %}<input type="hidden" name="kind" value="guide"><input type="hidden" name="slug" value="{{ guide.slug }}">
+          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+          <button type="submit" class="secondary">+ Ajouter à ma lecture</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</article>
+
+{% if guide.summary %}
+<section class="card">
+  <h2>Présentation</h2>
+  {{ guide.summary|linebreaks }}
+</section>
+{% endif %}
+
+{% if documents|length > 1 %}
+<section class="card">
+  <h2>Documents</h2>
+  <ul class="documents">
+    {% for document in documents %}
+      <li>
+        <span>{{ document.label }}{% if document.page_count %} <span class="muted">· {{ document.page_count }} p.</span>{% endif %}</span>
+        {% if document.file %}<a class="button secondary" href="{% url 'catalogue:guide_read' guide.slug document.pk %}">Ouvrir</a>
+        {% elif document.source_url %}<a class="button secondary" href="{{ document.source_url }}" target="_blank" rel="noopener noreferrer">Site de l'ANSSI</a>{% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+{% if not quiz_series and quiz_reviews is not None and has_pdf and ai_enabled %}
+<section class="card offer">
+  <span class="bonus-icon" aria-hidden="true">✍️</span>
+  <div><h2>Pas encore de QCM</h2><p class="muted">Vous pouvez demander à l'IA locale de proposer un questionnaire, à relire avant publication.</p></div>
+  <form method="post" action="{% url 'catalogue:review_request' guide.slug %}">{% csrf_token %}<button type="submit">Générer le QCM</button></form>
+</section>
+{% endif %}
+{% if quiz_series %}
+<section class="card" id="test">
+  <h2>Test de connaissances</h2>
+  {% include "catalogue/_quiz_series.html" with series=quiz_series %}
+  {% if not guide.finished_at %}<p class="muted">Lisez le guide puis marquez-le comme lu pour ouvrir la première série. Une nouvelle série s'ouvre ensuite chaque jour.</p>{% endif %}
+</section>
+{% endif %}
+
+<section class="card">
+  <h2>Certifications associées</h2>
+  {% if cited_by %}
+    <ul class="documents">
+      {% for entry in cited_by %}
+        <li>
+          <span><a href="{{ entry.certification.get_absolute_url }}"><strong>{{ entry.certification.acronym|default:entry.certification.name }}</strong></a>
+            <span class="muted">— cité dans {% for c in entry.citations %}{{ c.referential.short_name }}{% if c.code %} [{{ c.code }}]{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}</span></span>
+          <span class="tag">{{ entry.certification.get_kind_display }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="empty-state">Aucun référentiel de certification ne cite ce guide.</p>
+  {% endif %}
+  {% if suggested_certifications %}
+    <p class="muted">Utile aussi pour préparer :
+      {% for c in suggested_certifications %}<a href="{{ c.get_absolute_url }}">{{ c.acronym|default:c.name }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+  {% endif %}
+</section>
+
+{% include "catalogue/_source.html" with item=guide %}
+{% endblock %}

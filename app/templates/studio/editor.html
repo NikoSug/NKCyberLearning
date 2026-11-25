@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+{% block title %}{% if item %}{% firstof item.title item.name %}{% else %}{{ type.new_label }}{% endif %} — Atelier de création — {{ instance_name }}{% endblock %}
+{% block content %}
+<p class="back-link"><a href="{{ back_url }}">← {{ type.plural }}</a></p>
+<header class="dash-head">
+  <div>
+    <p class="eyebrow">{{ type.icon }} {{ type.label }}{% if item.author %} · par {{ item.author.username }}{% endif %}</p>
+    <h1>{% if item %}{% firstof item.title item.name %}{% else %}{{ type.new_label }}{% endif %}</h1>
+  </div>
+</header>
+
+{% if item %}
+<section class="editor-bar{% if problems %} has-problems{% endif %}">
+  {% if spec.editorial %}
+    {% include "studio/_status.html" with code=item.editorial_status|default:"publie" label=status hint=hint %}
+    <div class="editor-bar-actions">
+      {% if item.editorial_status == "redaction" and editable and not manager %}
+        <form method="post" action="{% url 'studio:action' key item.pk %}">{% csrf_token %}<button type="submit" name="action" value="soumettre">Soumettre à la relecture</button></form>
+      {% endif %}
+      {% if manager and draft %}
+        <form method="post" action="{% url 'studio:action' key item.pk %}">{% csrf_token %}<button type="submit" name="action" value="publier">Publier</button></form>
+      {% endif %}
+      {% if manager and item.editorial_status == "a_relire" %}
+        <form method="post" action="{% url 'studio:action' key item.pk %}">{% csrf_token %}<button type="submit" name="action" value="renvoyer" class="secondary">Renvoyer au rédacteur</button></form>
+      {% endif %}
+      {% if public_url %}<a class="button secondary" href="{{ public_url }}">Voir la page publiée ↗</a>{% endif %}
+      {% if deletable %}
+        <form method="post" action="{% url 'studio:action' key item.pk %}" data-confirm="Supprimer définitivement ce brouillon ?">{% csrf_token %}<button type="submit" name="action" value="supprimer" class="link small">Supprimer</button></form>
+      {% endif %}
+    </div>
+  {% else %}
+    {% include "studio/_status.html" with code="publie" label="Visible" hint="Les modifications sont visibles tout de suite." %}
+    <div class="editor-bar-actions">
+      {% if public_url %}<a class="button secondary" href="{{ public_url }}">Voir la page publiée ↗</a>{% endif %}
+      {% if key == "domaine" and not item.guides.exists %}
+        <form method="post" action="{% url 'studio:action' key item.pk %}" data-confirm="Supprimer ce domaine ?">{% csrf_token %}<button type="submit" name="action" value="supprimer" class="link small">Supprimer (domaine vide)</button></form>
+      {% endif %}
+    </div>
+  {% endif %}
+</section>
+{% else %}
+<section class="editor-bar">
+  {% include "studio/_status.html" with code="redaction" label="Nouveau" hint=new_hint %}
+</section>
+{% endif %}
+
+<div class="studio-main">
+    <form method="post" enctype="multipart/form-data" class="card studio-form-card"{% if item %} action="{% url 'studio:edit' key item.pk %}"{% endif %}>{% csrf_token %}
+      {% if form.non_field_errors %}<p class="error">{{ form.non_field_errors|join:" " }}</p>{% endif %}
+      {% for title, fields in form.sections %}
+        <fieldset class="studio-section"{% if not editable %} disabled{% endif %}>
+          <legend>{{ title }}</legend>
+          <div class="studio-fields">
+            {% for field in fields %}
+              {% include "studio/_field.html" %}
+              {% if field.name == ai_target and item and editable %}{% include "studio/_ai_tools.html" with kind="fiche" target=ai_target %}{% endif %}
+            {% endfor %}
+          </div>
+        </fieldset>
+      {% endfor %}
+      {% if editable %}<div class="actions studio-save"><button type="submit">{% if item %}Enregistrer{% else %}Créer{% endif %}</button></div>{% endif %}
+    </form>
+
+    {% if item and "documents" in spec.blocks %}
+      <section class="card studio-block" id="documents">
+        <h2>📄 Documents du guide</h2>
+        <p class="muted small">Le premier PDF est celui qu'on lit, qu'on écoute, et dont l'IA tire les QCM, le lexique et le résumé.</p>
+        {% for document in documents %}
+          <div class="studio-line">
+            <span>{{ document.label }}{% if document.page_count %} <span class="muted small">· {{ document.page_count }} pages</span>{% endif %}</span>
+            {% if editable %}
+              <form method="post" action="{% url 'studio:guide_document' item.pk %}" data-confirm="Retirer « {{ document.label }} » ?">{% csrf_token %}
+                <input type="hidden" name="action" value="retirer"><input type="hidden" name="document" value="{{ document.pk }}">
+                <button type="submit" class="icon danger" title="Retirer" aria-label="Retirer {{ document.label }}">✕</button>
+              </form>
+            {% endif %}
+          </div>
+        {% empty %}<p class="empty-state">Aucun PDF pour l'instant.</p>{% endfor %}
+        {% if editable %}
+          <form method="post" action="{% url 'studio:guide_document' item.pk %}" enctype="multipart/form-data" class="studio-inline-form">{% csrf_token %}
+            <label>{{ document_form.label.label }}{{ document_form.label }}</label>
+            <label>{{ document_form.file.label }}<input type="file" name="file" accept="application/pdf" required></label>
+            <button type="submit" class="small" data-busy="Envoi du PDF…">Ajouter le PDF</button>
+          </form>
+        {% endif %}
+      </section>
+    {% endif %}
+
+    {% if item and "grid" in spec.blocks %}
+      <section class="card studio-block" id="grille">
+        <h2>📐 {% if exam %}Domaines du programme{% else %}Grille d'exigences{% endif %} <span class="count">{{ grid_count }}</span></h2>
+        <p class="muted small">{% if exam %}Un domaine par ligne « - Domaine 1 : Sécurité et gestion des risques [15 %] » ; une sous-ligne indentée
+          « &nbsp;&nbsp;- … » pour un sous-domaine.{% else %}« ## Chapitre » pour regrouper, « - R12 : Exigence » pour une exigence,
+          « &nbsp;&nbsp;- … » (indenté) pour un point de vérification, « &nbsp;&nbsp;&gt; … » pour une précision.{% endif %}
+          Une ligne qui garde sa référence garde aussi la progression des apprenants.</p>
+        <form method="post" action="{% url 'studio:grid_save' key item.pk %}">{% csrf_token %}
+          <textarea name="grid" rows="16" class="mono"{% if not editable %} readonly{% endif %}>{{ grid_text }}</textarea>
+          {% if editable %}
+          <div class="actions">
+            <button type="submit" name="action" value="texte" class="small">Enregistrer la grille</button>
+            {% if not exam %}<button type="submit" name="action" value="trame" class="small secondary"{% if not item.trame %} disabled title="Ajoutez d'abord la trame Excel"{% endif %}>Importer depuis la trame Excel</button>{% endif %}
+            <button type="submit" name="action" value="sommaire" class="small secondary"{% if not item.document %} disabled title="Ajoutez d'abord le PDF"{% endif %} data-confirm="Remplacer la grille par les sections du sommaire du PDF ?">Importer le sommaire du PDF</button>
+          </div>
+          {% endif %}
+        </form>
+      </section>
+    {% endif %}
+
+    {% if item and "citations" in spec.blocks %}
+      <section class="card studio-block" id="citations">
+        <h2>🔗 Documents cités <span class="count">{{ citations|length }}</span></h2>
+        <p class="muted small">Les guides que ce référentiel cite : ils apparaissent sur sa page, et la certification les recommande.</p>
+        {% for citation in citations %}
+          <div class="studio-line">
+            <span>{% if citation.code %}<strong>{{ citation.code }}</strong> {% endif %}{{ citation.title|truncatechars:110 }}</span>
+            {% if editable %}
+              <form method="post" action="{% url 'studio:citations_save' item.pk %}" class="studio-line-actions">{% csrf_token %}
+                <input type="hidden" name="citation" value="{{ citation.pk }}">
+                <select name="guide" aria-label="Guide correspondant" data-autosubmit>
+                  <option value="">— Aucun guide du catalogue —</option>
+                  {% for guide in guides %}<option value="{{ guide.pk }}"{% if guide.pk == citation.guide_id %} selected{% endif %}>{{ guide.title|truncatechars:80 }}</option>{% endfor %}
+                </select>
+                <button type="submit" name="action" value="relier" class="small secondary" data-autosubmit-hide>Relier</button>
+                <button type="submit" name="action" value="retirer" class="icon danger" title="Retirer" aria-label="Retirer">✕</button>
+              </form>
+            {% elif citation.guide %}<a class="small" href="{{ citation.guide.get_absolute_url }}">{{ citation.guide.title|truncatechars:60 }}</a>{% endif %}
+          </div>
+        {% empty %}<p class="empty-state">Aucun document cité.</p>{% endfor %}
+        {% if editable %}
+          <form method="post" action="{% url 'studio:citations_save' item.pk %}" class="studio-inline-form">{% csrf_token %}
+            <label>Renvoi<input type="text" name="code" maxlength="60" placeholder="[12]"></label>
+            <label>Titre cité<input type="text" name="title" maxlength="500" placeholder="Laisser vide pour reprendre le titre du guide"></label>
+            <label>Guide<select name="guide"><option value="">— Choisir —</option>{% for guide in guides %}<option value="{{ guide.pk }}">{{ guide.title|truncatechars:80 }}</option>{% endfor %}</select></label>
+            <button type="submit" name="action" value="ajouter" class="small">Ajouter</button>
+          </form>
+          <form method="post" action="{% url 'studio:citations_save' item.pk %}">{% csrf_token %}
+            <button type="submit" name="action" value="extraire" class="small secondary"{% if not item.document %} disabled title="Ajoutez d'abord le PDF"{% endif %} data-busy="Lecture du PDF…">Retrouver les documents cités dans le PDF</button>
+          </form>
+        {% endif %}
+      </section>
+    {% endif %}
+
+    {% if item and "members" in spec.blocks %}
+      <section class="card studio-block" id="contenu">
+        <h2>📚 Guides du domaine <span class="count">{{ members|length }}</span></h2>
+        <p class="muted small">Ils forment le parcours de lecture du domaine et servent de sources à ses cours et podcasts.</p>
+        {% for guide in members %}
+          <div class="studio-line">
+            <span><a href="{% url 'studio:edit' 'guide' guide.pk %}">{{ guide.title }}</a>
+              <span class="muted small">· {{ guide.get_level_display }}{% if not guide.is_published %} · brouillon{% endif %}</span></span>
+            <form method="post" action="{% url 'studio:domain_members' item.pk %}" class="studio-line-actions">{% csrf_token %}
+              <input type="hidden" name="action" value="deplacer-guide"><input type="hidden" name="guide" value="{{ guide.pk }}">
+              <select name="vers" aria-label="Déplacer vers" data-autosubmit>
+                <option value="">Déplacer vers…</option>
+                {% for other in other_domains %}<option value="{{ other.pk }}">{{ other.name }}</option>{% endfor %}
+              </select>
+              <button type="submit" class="small secondary" data-autosubmit-hide>Déplacer</button>
+            </form>
+          </div>
+        {% empty %}<p class="empty-state">Aucun guide dans ce domaine.</p>{% endfor %}
+        <form method="post" action="{% url 'studio:domain_members' item.pk %}" class="studio-inline-form">{% csrf_token %}
+          <input type="hidden" name="action" value="ajouter-guide">
+          <label>Ajouter un guide<select name="guide" required><option value="">— Choisir un guide —</option>
+            {% for guide in other_guides %}<option value="{{ guide.pk }}">{{ guide.title|truncatechars:80 }}{% if guide.category %} (aujourd'hui : {{ guide.category.name }}){% endif %}</option>{% endfor %}</select></label>
+          <button type="submit" class="small">Ajouter au domaine</button>
+        </form>
+      </section>
+
+      <section class="card studio-block">
+        <h2>🏅 Certifications préparées <span class="count">{{ certifications|length }}</span></h2>
+        <p class="muted small">Les guides du domaine sont conseillés sur la page de ces certifications.</p>
+        {% for certification in certifications %}
+          <div class="studio-line">
+            <span><a href="{% url 'studio:edit' 'certification' certification.pk %}">{{ certification.name }}</a></span>
+            <form method="post" action="{% url 'studio:domain_members' item.pk %}">{% csrf_token %}
+              <input type="hidden" name="action" value="delier-certification"><input type="hidden" name="certification" value="{{ certification.pk }}">
+              <button type="submit" class="icon danger" title="Détacher" aria-label="Détacher {{ certification.name }}">✕</button>
+            </form>
+          </div>
+        {% empty %}<p class="empty-state">Aucune certification rattachée.</p>{% endfor %}
+        <form method="post" action="{% url 'studio:domain_members' item.pk %}" class="studio-inline-form">{% csrf_token %}
+          <input type="hidden" name="action" value="lier-certification">
+          <label>Rattacher une certification<select name="certification" required><option value="">— Choisir —</option>
+            {% for certification in other_certifications %}<option value="{{ certification.pk }}">{{ certification.name|truncatechars:80 }}</option>{% endfor %}</select></label>
+          <button type="submit" class="small">Rattacher</button>
+        </form>
+      </section>
+
+      <section class="card studio-block">
+        <h2>🎓 Ce qui en dépend</h2>
+        <p class="muted small">Cours, podcasts et parcours rattachés à ce domaine (on change leur domaine depuis leur propre page).</p>
+        <ul class="plain-list">
+          {% for course in courses %}<li>🎓 <a href="{% url 'courses:review_course' course.pk %}">{{ course.title }}</a> <span class="muted small">· {{ course.get_status_display }}</span></li>{% endfor %}
+          {% for s in series %}<li>🎙️ <a href="{% url 'podcasts:review_series' s.pk %}">{{ s.title }}</a> <span class="muted small">· {{ s.get_status_display }}</span></li>{% endfor %}
+          {% for path in custom_paths %}<li>🧭 <a href="{% url 'studio:edit' 'parcours' path.pk %}">{{ path.title }}</a></li>{% endfor %}
+          {% if not courses and not series and not custom_paths %}<li class="muted">Rien pour l'instant.</li>{% endif %}
+        </ul>
+      </section>
+    {% endif %}
+
+    {% if item and "steps" in spec.blocks %}
+      <section class="card studio-block" id="etapes">
+        <h2>🧭 Étapes du parcours <span class="count">{{ steps|length }}</span></h2>
+        <ol class="studio-steps">
+          {% for step in steps %}
+            <li id="s{{ step.pk }}">
+              <div class="studio-step-head">
+                <span class="queue-position">{{ forloop.counter }}</span>
+                <span class="studio-step-title"><a href="{{ step.guide.get_absolute_url }}">{{ step.guide.title }}</a>
+                  <span class="muted small">{{ step.guide.get_level_display }} · {{ step.guide.duration_display }}</span></span>
+                {% if editable %}
+                  <form method="post" action="{% url 'studio:path_step' item.pk %}" class="queue-actions">{% csrf_token %}
+                    <input type="hidden" name="step" value="{{ step.pk }}">
+                    <button type="submit" name="action" value="monter" class="icon" aria-label="Monter"{% if forloop.first %} disabled{% endif %}>↑</button>
+                    <button type="submit" name="action" value="descendre" class="icon" aria-label="Descendre"{% if forloop.last %} disabled{% endif %}>↓</button>
+                    <button type="submit" name="action" value="retirer" class="icon danger" aria-label="Retirer">✕</button>
+                  </form>
+                {% endif %}
+              </div>
+              {% if editable %}
+                <form method="post" action="{% url 'studio:path_step' item.pk %}" class="studio-step-note">{% csrf_token %}
+                  <input type="hidden" name="step" value="{{ step.pk }}"><input type="hidden" name="action" value="note">
+                  <input type="text" name="note" value="{{ step.note }}" maxlength="300" placeholder="Pourquoi ce guide à cette étape ? (affiché aux apprenants)">
+                  <button type="submit" class="small secondary">OK</button>
+                </form>
+              {% elif step.note %}<p class="small">{{ step.note }}</p>{% endif %}
+            </li>
+          {% empty %}<li class="empty-state">Ajoutez les guides du parcours, dans l'ordre de lecture.</li>{% endfor %}
+        </ol>
+        {% if editable %}
+          <form method="post" action="{% url 'studio:path_step' item.pk %}" class="studio-inline-form">{% csrf_token %}
+            <input type="hidden" name="action" value="ajouter">
+            <label>Guide à ajouter<select name="guide" required><option value="">— Choisir un guide —</option>{% for guide in guides %}<option value="{{ guide.pk }}">{{ guide.title|truncatechars:90 }}</option>{% endfor %}</select></label>
+            <label>Pourquoi à cette étape<input type="text" name="note" maxlength="300"></label>
+            <button type="submit" class="small">Ajouter l'étape</button>
+          </form>
+        {% endif %}
+      </section>
+    {% endif %}
+</div>
+{% endblock %}

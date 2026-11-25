@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Certifications — {{ instance_name }}{% endblock %}
+{% block content %}
+{% include "catalogue/_catalogue_tabs.html" %}
+
+{% for c in certifications %}
+  {% ifchanged c.kind %}<h2 class="group-title">{{ c.get_kind_display }}</h2>{% endifchanged %}
+  <div class="item">
+    <div class="item-body">
+      <a href="{{ c.get_absolute_url }}" class="item-title">{{ c.name }}{% if c.acronym %} ({{ c.acronym }}){% endif %}</a>
+      <p class="meta">
+        {% if c.level %}<span class="level level-{{ c.level }}">{{ c.get_level_display }}</span>{% endif %}
+        {% if c.issuer %}<span>{{ c.issuer }}</span>{% endif %}
+      </p>
+    </div>
+  </div>
+{% empty %}
+  <p class="empty-state">Aucune certification ne correspond à ces filtres.</p>
+{% endfor %}
+<p class="source-note">Les noms de certification sont des marques de leurs détenteurs (ISC2, ISACA, CompTIA, EC-Council, OffSec, AWS…) ;
+  {{ instance_name }} n'est affilié à aucun d'eux ni approuvé par eux. Les informations sont résumées à titre indicatif : la page officielle de chaque certification fait foi.</p>
+{% endblock %}

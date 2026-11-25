@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}{{ referential.short_name|default:referential.name }} — {{ instance_name }}{% endblock %}
+{% block content %}
+<p class="back-link"><a href="{% if referential.kind == 'exam' %}{% url 'catalogue:exam_list' %}{% else %}{% url 'catalogue:referential_list' %}{% endif %}">← {% if referential.kind == 'exam' %}Programmes d'examen{% else %}Référentiels{% endif %}</a></p>
+<article class="card">
+  <p class="eyebrow">{{ referential.get_kind_display }}{% if referential.issuer %} · {{ referential.issuer }}{% endif %}{% if referential.version %} · version {{ referential.version }}{% endif %}</p>
+  <h1>{{ referential.name }}</h1>
+  {% if referential.description %}<p>{{ referential.description }}</p>{% endif %}
+  <div class="actions">
+    {% if referential.document %}
+      <a class="button" href="{% url 'catalogue:referential_read' referential.slug %}">Lire le référentiel</a>
+      {% if referential.finished_at %}<span class="badge read">Lu le {{ referential.finished_at|date:"d/m/Y" }}</span>
+      {% elif referential.in_list %}<span class="badge listed">Dans ma lecture</span>
+      {% else %}
+        <form method="post" action="{% url 'catalogue:reading_add' %}" class="inline">
+          {% csrf_token %}<input type="hidden" name="kind" value="referentiel"><input type="hidden" name="slug" value="{{ referential.slug }}">
+          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+          <button type="submit" class="secondary">+ Ajouter à ma lecture</button>
+        </form>
+      {% endif %}
+    {% endif %}
+  </div>
+  <p class="links">
+    {% if referential.trame %}<a href="{% url 'catalogue:referential_trame' referential.slug %}" title="{{ referential.trame_label }}">Trame d'évaluation ANSSI (Excel)</a>{% endif %}
+    {% if total %}<a href="{% url 'catalogue:referential_export' referential.slug %}">Ma grille (Excel)</a>{% endif %}
+    {% if referential.source_url %}<a href="{{ referential.source_url }}" target="_blank" rel="noopener noreferrer">Source officielle</a>{% endif %}
+  </p>
+  {% if certifications %}<p class="muted">Utilisé par : {% for c in certifications %}<a href="{{ c.get_absolute_url }}">{{ c.acronym|default:c.name }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+  {% if referential.grid_source %}<p class="muted">Origine de la grille : {{ referential.grid_source }}.</p>{% endif %}
+  {% if citations %}
+    <details>
+      <summary>Documents ANSSI cités ({{ citations|length }})</summary>
+      <ul>
+        {% for c in citations %}
+          <li>{% if c.code %}<span class="ref">[{{ c.code }}]</span> {% endif %}
+            {% if c.guide %}<a href="{{ c.guide.get_absolute_url }}">{{ c.title }}</a>{% else %}{{ c.title }}{% endif %}</li>
+        {% endfor %}
+      </ul>
+    </details>
+  {% endif %}
+</article>
+
+{% if quiz_series %}
+<section class="card" id="test">
+  <h2>Test de connaissances</h2>
+  <p class="muted">Prouvez que vous savez ce que ce référentiel attend : chaque question vous place face à une situation de terrain.</p>
+  {% include "catalogue/_quiz_series.html" with guide=referential series=quiz_series referential=True %}
+  {% if not referential.finished_at %}<p class="muted">Lisez le référentiel puis marquez-le comme lu pour ouvrir la première série. Une nouvelle série s'ouvre ensuite chaque jour.</p>{% endif %}
+</section>
+{% elif can_generate_quiz and quiz_reviews is not None and ai_enabled %}
+<section class="card offer">
+  <span class="bonus-icon" aria-hidden="true">✍️</span>
+  <div><h2>Pas encore de QCM</h2><p class="muted">Vous pouvez demander à l'IA locale de proposer un questionnaire sur ce référentiel, à relire avant publication.</p></div>
+  <form method="post" action="{% url 'catalogue:review_request_referential' referential.slug %}">{% csrf_token %}<button type="submit">Générer le QCM</button></form>
+</section>
+{% endif %}
+
+{% if quiz_guides %}
+<section class="card">
+  <h2>Se tester</h2>
+  <p class="muted">Ce référentiel s'appuie sur ces guides : leurs tests de connaissances vérifient que vous en maîtrisez les recommandations.</p>
+  <ul>
+    {% for g in quiz_guides %}
+      <li><a href="{{ g.get_absolute_url }}#test">{{ g.title }}</a> · {{ g.quiz_series }} série{{ g.quiz_series|pluralize }}{% if g.finished_at %} <span class="badge read">Lu</span>{% endif %}</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+{% if total %}
+<section class="progress-card">
+  <p><strong>{{ done }}</strong> / {{ total }} lignes validées ou non applicables ({{ progress }} %)</p>
+  <progress class="progress" value="{{ progress }}" max="100" aria-label="Progression : {{ progress }} %">{{ progress }} %</progress>
+  <form method="get" class="filters">
+    <select name="statut" aria-label="Filtrer par statut" data-autosubmit>
+      <option value="">Toutes les lignes</option>
+      {% for value, label in statuses %}<option value="{{ value }}" {% if value == status_filter %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <button type="submit" data-autosubmit-hide>Filtrer</button>
+  </form>
+</section>
+
+{% for section in sections %}
+  <section class="card grid-section">
+    {% if section.theme %}<h2>{{ section.theme }}</h2>{% endif %}
+    {% for row in section.rows %}
+      <div class="requirement status-{{ row.status }}" id="req-{{ row.pk }}">
+        <div class="requirement-head">
+          <div>
+            {% if row.ref %}<span class="ref">{{ row.ref }}</span>{% endif %}
+            {% if row.kind == "recommendation" %}<span class="tag">Recommandation</span>{% endif %}
+            {% if row.weight %}<span class="tag">{{ row.weight }} de l'examen</span>{% endif %}
+            <p class="requirement-text">{{ row.text|linebreaksbr }}</p>
+          </div>
+          <form method="post" action="{% url 'catalogue:requirement_status' row.pk %}" class="status-form">
+            {% csrf_token %}
+            <input type="hidden" name="statut_filtre" value="{{ status_filter }}">
+            <select name="status" aria-label="Statut de {{ row.ref|default:'la ligne' }}" data-autosubmit>
+              {% for value, label in statuses %}<option value="{{ value }}" {% if value == row.status %}selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select>
+            <button type="submit" class="small" data-autosubmit-hide>Enregistrer</button>
+          </form>
+        </div>
+        {% if row.guidance %}<p class="muted">{{ row.guidance|linebreaksbr }}</p>{% endif %}
+        {% if row.checks_list or row.evidence %}
+          <details>
+            <summary>{% if row.checks_list %}{{ row.checks_list|length }} point{{ row.checks_list|length|pluralize }} de vérification{% else %}Preuves attendues{% endif %}</summary>
+            {% if row.evidence %}<p><strong>Preuves attendues :</strong> {{ row.evidence|linebreaksbr }}</p>{% endif %}
+            {% for check in row.checks_list %}
+              <div class="check">
+                {% if check.ref %}<span class="ref">{{ check.ref }}</span>{% endif %}
+                <p>{{ check.text|linebreaksbr }}</p>
+                {% if check.guidance %}<p class="muted">{{ check.guidance|linebreaksbr }}</p>{% endif %}
+                {% if check.evidence %}<p class="muted"><strong>Preuves :</strong> {{ check.evidence|linebreaksbr }}</p>{% endif %}
+              </div>
+            {% endfor %}
+          </details>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </section>
+{% empty %}
+  <p class="empty-state">Aucune ligne avec ce statut.</p>
+{% endfor %}
+{% endif %}
+{% if referential.is_third_party %}{% include "catalogue/_third_party.html" with name=referential.short_name|default:referential.name issuer=referential.issuer url=referential.source_url %}
+{% else %}{% include "catalogue/_source.html" with item=referential %}{% endif %}
+{% endblock %}

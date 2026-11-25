@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}{{ series.title }} — Podcasts — {{ instance_name }}{% endblock %}
+{% block content %}
+<p class="back-link"><a href="{% url 'podcasts:podcast_list' %}">← Podcasts</a></p>
+<header class="dash-head">
+  <p class="eyebrow">Podcast · {{ series.category.name }} · {{ episodes|length }} épisode{{ episodes|length|pluralize }} · {{ series.duration_display }}</p>
+  <h1>{{ series.title }}</h1>
+  {% if series.summary %}<p class="muted">{{ series.summary }}</p>{% endif %}
+</header>
+
+<section class="card player" data-player
+         data-progress-url="{% url 'podcasts:listen_progress' series.slug %}"
+         data-start-section="{{ progress.episode|default:1 }}" data-start-seconds="{{ progress.seconds|default:0|stringformat:'.1f' }}"
+         data-title="{{ series.title }}">
+  {% csrf_token %}
+  <audio preload="metadata" data-audio></audio>
+  <p class="player-now"><span class="eyebrow">En cours</span> <strong data-now-title>{{ episodes.0.title }}</strong></p>
+  <div class="player-bar">
+    <span class="player-time" data-time>0:00</span>
+    <input type="range" min="0" max="100" step="0.1" value="0" data-seek aria-label="Position dans l'épisode">
+    <span class="player-time" data-duration>0:00</span>
+  </div>
+  <div class="player-controls">
+    <button type="button" class="icon round" data-prev title="Épisode précédent" aria-label="Épisode précédent">⏮</button>
+    <button type="button" class="icon round" data-back title="Reculer de 15 secondes" aria-label="Reculer de 15 secondes">↺ 15</button>
+    <button type="button" class="play" data-play aria-label="Lecture">▶</button>
+    <button type="button" class="icon round" data-forward title="Avancer de 15 secondes" aria-label="Avancer de 15 secondes">15 ↻</button>
+    <button type="button" class="icon round" data-next title="Épisode suivant" aria-label="Épisode suivant">⏭</button>
+    <label class="speed">Vitesse
+      <select data-speed>
+        <option value="0.75">×0,75</option><option value="1" selected>×1</option><option value="1.25">×1,25</option>
+        <option value="1.5">×1,5</option><option value="1.75">×1,75</option><option value="2">×2</option>
+      </select>
+    </label>
+  </div>
+  <p class="player-status muted small" data-status aria-live="polite">
+    {% if progress.completed_at %}Série écoutée en entier le {{ progress.completed_at|date:"d/m/Y" }}.
+    {% else %}+{{ episode_xp }} XP par épisode écouté jusqu'au bout, +{{ series_xp }} XP pour la série entière.{% endif %}
+  </p>
+</section>
+
+<h2 class="group-title">Épisodes</h2>
+<ol class="chapters">
+  {% for episode in episodes %}
+    <li class="chapter{% if episode.listened %} listened{% endif %}" data-chapter data-position="{{ episode.position }}"
+        data-src="{% url 'podcasts:episode_audio' series.slug episode.position %}" data-title="{{ episode.title }}">
+      <button type="button" class="chapter-button" data-chapter-play>
+        <span class="chapter-mark" aria-hidden="true">{% if episode.listened %}✓{% else %}{{ episode.position }}{% endif %}</span>
+        <span class="chapter-title">{{ episode.title }}{% if episode.summary %}<span class="muted small episode-summary">{{ episode.summary }}</span>{% endif %}</span>
+        <span class="muted small">{{ episode.clock }}</span>
+      </button>
+      <details class="transcript">
+        <summary class="small">Transcription</summary>
+        <div class="dialogue">
+          {% for line in episode.lines %}<p><strong class="host host-{{ line.speaker }}">{{ line.host }}</strong> {{ line.text }}</p>{% endfor %}
+        </div>
+      </details>
+    </li>
+  {% endfor %}
+</ol>
+
+<p class="muted small credit">Discussion écrite par une IA locale à partir des guides de l'ANSSI{% if episodes.0.sources %} (notamment : {{ episodes.0.sources }}){% endif %},
+  (réutilisés sous <a href="https://www.etalab.gouv.fr/licence-ouverte-open-licence/" target="_blank" rel="noopener noreferrer">Licence Ouverte v2.0</a>, sans validation de l'ANSSI), relue avant publication, puis lue par synthèse vocale (Kyutai TTS, licence CC BY 4.0 ; voix de Kyutai, CC0).
+  Clara et Hugo sont des voix de synthèse. Pour le détail des recommandations, <a href="{% url 'catalogue:path_detail' series.category.slug %}">consultez les guides du thème</a>.</p>
+{% endblock %}

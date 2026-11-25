@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Podcasts — {{ instance_name }}{% endblock %}
+{% block content %}
+<header class="dash-head">
+  <div>
+    <p class="eyebrow">Apprendre en écoutant</p>
+    <h1>Podcasts</h1>
+    <p class="muted">Clara pose les questions, Hugo explique : des discussions simples sur chaque thème de la cybersécurité,
+      inspirées des guides de l'ANSSI. À écouter dans les transports, en marchant, en cuisinant…</p>
+  </div>
+  {% if user.is_author %}<div class="head-actions">
+    <a class="button small" href="{% url 'studio:create' 'podcast' %}">+ Ajouter un podcast</a>
+    {% if user.is_content_manager %}<a class="button secondary small" href="{% url 'catalogue:review_list' %}?type=podcast">✍️ Relecture</a>{% endif %}
+  </div>{% endif %}
+</header>
+
+{% if in_progress %}
+  <h2 class="group-title">Reprendre l'écoute</h2>
+  <div class="path-grid">
+    {% for item in in_progress %}
+      <a class="card path-mini" href="{{ item.get_absolute_url }}">
+        <span class="path-name">{{ item.title }}</span>
+        <progress class="progress" value="{{ item.listened }}" max="{{ item.episode_count }}">{{ item.listened }}</progress>
+        <span class="muted small">{{ item.listened }} / {{ item.episode_count }} épisode{{ item.episode_count|pluralize }} écouté{{ item.listened|pluralize }}</span>
+      </a>
+    {% endfor %}
+  </div>
+{% endif %}
+
+<h2 class="group-title">Séries <span class="count">{{ series|length }}</span></h2>
+<div class="course-grid">
+  {% for item in series %}
+    <a class="card course-card{% if item.listened and item.listened >= item.episode_count %} done{% endif %}" href="{{ item.get_absolute_url }}">
+      <span class="course-kind">🎙️ {{ item.category.name }}</span>
+      <span class="course-title">{{ item.title }}</span>
+      {% if item.summary %}<span class="muted small">{{ item.summary|truncatechars:150 }}</span>{% endif %}
+      <span class="course-meta">
+        <span class="level level-{{ item.level }}">{{ item.get_level_display }}</span>
+        <span class="muted small">{{ item.episode_count }} épisode{{ item.episode_count|pluralize }} · {{ item.duration_display }}</span>
+        {% if item.listened %}<span class="small{% if item.listened >= item.episode_count %} ok-text{% endif %}">{{ item.listened }} / {{ item.episode_count }} ✓</span>{% endif %}
+      </span>
+      {% if item.listened %}<progress class="progress" value="{{ item.listened }}" max="{{ item.episode_count }}">{{ item.listened }}</progress>{% endif %}
+    </a>
+  {% empty %}
+    <p class="empty-state">Aucun podcast publié pour l'instant.</p>
+  {% endfor %}
+</div>
+{% endblock %}

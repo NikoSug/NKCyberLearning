@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Ma lecture — {{ instance_name }}{% endblock %}
+{% block content %}
+<header class="dash-head">
+  <div>
+    <p class="eyebrow">Mon apprentissage</p>
+    <h1>Ma lecture</h1>
+    <p class="muted">Les guides et référentiels que vous avez choisis, dans l'ordre où vous voulez les lire.</p>
+  </div>
+  <div class="head-actions"><a class="button secondary small" href="{% url 'catalogue:study_plan' %}">📅 Mon planning</a></div>
+</header>
+
+{% if not to_read and not finished %}
+  <section class="card empty">
+    <p>Votre liste est vide.</p>
+    <p class="muted">Recherchez un guide ou un référentiel, puis cliquez sur <span class="add-sample">+</span> pour l'ajouter ici.</p>
+    <p><a class="button" href="{% url 'catalogue:search' %}">Rechercher</a>
+       <a class="button secondary" href="{% url 'catalogue:guide_list' %}">Parcourir les guides</a></p>
+  </section>
+{% else %}
+  <section class="progress-card">
+    <p><strong>{{ finished|length }}</strong> lu{{ finished|length|pluralize }} sur {{ total }}
+      {% if to_read %}· environ {{ hours_left }} h de lecture restante · <a href="{% url 'catalogue:study_plan' %}">Mon planning</a>{% endif %}</p>
+    <progress class="progress" value="{{ progress }}" max="100" aria-label="Progression : {{ progress }} %">{{ progress }} %</progress>
+  </section>
+
+  <h2 class="group-title">À lire <span class="count">{{ to_read|length }}</span></h2>
+  {% for item in to_read %}
+    {% with doc=item.document %}
+    <div class="item">
+      <div class="item-body">
+        <a href="{{ doc.get_absolute_url }}" class="item-title">{{ doc.title }}</a>
+        <p class="meta">
+          {% if item.is_guide %}<span class="level level-{{ doc.level }}">{{ doc.get_level_display }}</span>{% else %}<span class="tag">Référentiel</span>{% endif %}
+          <span>{{ doc.duration_display }}</span>
+          {% if doc.quiz_series %}<span class="tag quiz" title="Test de connaissances : {{ doc.quiz_series }} série{{ doc.quiz_series|pluralize }} de questions">QCM · {{ doc.quiz_series }} série{{ doc.quiz_series|pluralize }}</span>{% endif %}
+          {% if item.started_at %}<span>En cours</span>{% endif %}
+        </p>
+      </div>
+      <div class="item-actions">
+        <form method="post" action="{% url 'catalogue:reading_item' item.pk %}" class="inline">
+          {% csrf_token %}
+          <button name="action" value="monter" class="icon" title="Monter" aria-label="Monter" {% if forloop.first %}disabled{% endif %}>↑</button>
+          <button name="action" value="descendre" class="icon" title="Descendre" aria-label="Descendre" {% if forloop.last %}disabled{% endif %}>↓</button>
+          <button name="action" value="lu" class="icon ok" title="Marquer comme lu" aria-label="Marquer comme lu">✓</button>
+          <button name="action" value="retirer" class="icon" title="Retirer de ma lecture" aria-label="Retirer de ma lecture">✕</button>
+        </form>
+      </div>
+    </div>
+    {% endwith %}
+  {% empty %}
+    <p class="muted">Tout est lu. <a href="{% url 'catalogue:search' %}">Trouver une nouvelle lecture</a>.</p>
+  {% endfor %}
+
+  {% if finished %}
+    <h2 class="group-title">Lus <span class="count">{{ finished|length }}</span></h2>
+    {% for item in finished %}
+      {% with doc=item.document %}
+      <div class="item done">
+        <div class="item-body">
+          <a href="{{ doc.get_absolute_url }}" class="item-title">{{ doc.title }}</a>
+          <p class="meta"><span>Lu le {{ item.finished_at|date:"d/m/Y" }}</span></p>
+        </div>
+        <form method="post" action="{% url 'catalogue:reading_item' item.pk %}" class="inline">
+          {% csrf_token %}
+          <button name="action" value="a-lire" class="link" title="Remettre dans la liste à lire">Relire</button>
+        </form>
+      </div>
+      {% endwith %}
+    {% endfor %}
+  {% endif %}
+{% endif %}
+{% endblock %}

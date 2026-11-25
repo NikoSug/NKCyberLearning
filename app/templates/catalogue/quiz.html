@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Test — {{ guide }} — {{ instance_name }}{% endblock %}
+{% block content %}
+<p class="back-link"><a href="{% url 'catalogue:tests_overview' %}">← Mes tests</a></p>
+<header class="dash-head">
+  <p class="eyebrow">Test de connaissances · série {{ number }} sur {{ total_series }}
+    {% if number == 1 %}· niveau découverte{% elif number == total_series %}· niveau expert{% endif %}</p>
+  <h1>{{ guide }}</h1>
+</header>
+
+{% if attempt %}
+  {% include "catalogue/_quiz_results.html" with message=result_message %}
+  <p class="actions">
+    <a class="button" href="{% url 'catalogue:tests_overview' %}">Mes tests</a>
+    <a class="button secondary" href="{{ retake_url }}">Refaire la série</a>
+    <a class="button secondary" href="{{ guide.get_absolute_url }}">Revoir le {% if is_referential %}référentiel{% else %}guide{% endif %}</a>
+  </p>
+{% else %}
+  {% include "catalogue/_quiz_form.html" %}
+{% endif %}
+{% include "catalogue/_source.html" with item=guide derived=True %}
+{% endblock %}

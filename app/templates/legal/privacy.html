@@ -1,0 +1,37 @@
+{% extends "legal/_layout.html" %}
+{% block legal %}
+<p>Responsable du traitement : <strong>{{ org.name|default:"[raison sociale]" }}</strong>. Contact pour vos données :
+  {% if org.dpo %}<a href="mailto:{{ org.dpo }}">{{ org.dpo }}</a>{% else %}[adresse e-mail du DPO ou du contact]{% endif %}.</p>
+
+<h2>Données traitées et finalités</h2>
+<table class="data-table">
+  <thead><tr><th>Données</th><th>Pourquoi</th><th>Durée de conservation</th></tr></thead>
+  <tbody>
+    <tr><td>Compte : pseudo, e-mail, mot de passe (empreinte Argon2), rôle</td><td>Accès à la plateforme (exécution du service)</td><td>Jusqu'à la suppression du compte</td></tr>
+    <tr><td>Activité d'apprentissage : lectures, tests, cours, écoutes, progression, amis</td><td>Suivi de votre formation, fonctions de la plateforme</td><td>Jusqu'à la suppression du compte</td></tr>
+    <tr><td>Questions à l'assistant : date et guide concerné (le texte de la question n'est pas conservé)</td><td>Limite d'usage, statistiques</td><td>{{ retention.short }} jours</td></tr>
+    <tr><td>Journal de sécurité : connexions, actions sensibles, adresse IP</td><td>Sécurité du service (intérêt légitime)</td><td>{{ retention.audit }} jours</td></tr>
+    <tr><td>Tentatives de connexion : pseudo, adresse IP</td><td>Protection contre les attaques par force brute</td><td>{{ retention.short }} jours</td></tr>
+    <tr><td>Double authentification : secret partagé, empreintes des codes de secours</td><td>Sécurité du compte</td><td>Jusqu'à sa désactivation ou la suppression du compte</td></tr>
+  </tbody>
+</table>
+
+<h2>Destinataires et transferts</h2>
+<p>Les données ne sont ni vendues ni cédées. Elles sont accessibles aux administrateurs de l'instance et à l'hébergeur
+  ({{ org.host|default:"[hébergeur]" }}). L'intelligence artificielle fonctionne sur les serveurs de l'instance : vos questions
+  et vos contenus ne sont envoyés à aucun service d'IA externe.</p>
+
+<h2>Cookies</h2>
+<p>Seuls deux cookies strictement nécessaires sont utilisés : la session (connexion, {{ retention.session_hours }} h au plus ou jusqu'à
+  la fermeture du navigateur) et la protection contre les requêtes forgées (CSRF). Aucun cookie de mesure d'audience ni de publicité.</p>
+
+<h2>Vos droits</h2>
+<p>Vous pouvez accéder à vos données et les télécharger, les rectifier, demander leur effacement ou vous opposer à un traitement.
+  Depuis <strong>Mon compte → Sécurité et données</strong>, vous téléchargez vos données et supprimez votre compte vous-même ;
+  pour toute autre demande, écrivez au contact ci-dessus. Vous pouvez aussi saisir la
+  <a href="https://www.cnil.fr/fr/plaintes" target="_blank" rel="noopener noreferrer">CNIL</a>.</p>
+
+<h2>Sécurité</h2>
+<p>Connexion chiffrée (TLS), mots de passe hachés (Argon2id), double authentification (obligatoire pour les comptes à droits élevés),
+  journal d'audit, sauvegardes chiffrées, cloisonnement des services.</p>
+{% endblock %}

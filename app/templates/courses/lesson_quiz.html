@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Quiz — {{ lesson.title }} — {{ instance_name }}{% endblock %}
+{% block content %}
+<p class="back-link"><a href="{{ lesson.get_absolute_url }}">← Revoir la leçon</a></p>
+<header class="dash-head">
+  <p class="eyebrow">Quiz · leçon {{ lesson.position }} · {{ course.title }}</p>
+  <h1>{{ lesson.title }}</h1>
+</header>
+
+{# Sans JavaScript : toutes les questions et un envoi groupé. Avec : une question à la fois, corrigée aussitôt. #}
+<form method="post" class="quiz-form lesson-quiz" data-lesson-quiz data-answer-url="{% url 'courses:lesson_answer' course.slug lesson.position %}">
+  {% csrf_token %}
+  <div class="quiz-progress">
+    <progress class="progress" value="0" max="{{ questions|length }}" data-quiz-progress aria-label="Questions répondues">0</progress>
+    <span data-lesson-position>{{ questions|length }} questions</span>
+  </div>
+  {% for q in questions %}
+    <fieldset class="card question" data-lesson-step data-question="{{ q.pk }}">
+      <legend class="question-text"><span class="ref">{{ forloop.counter }}</span><span>{{ q.text }}</span></legend>
+      <div class="choices-list">
+        {% for choice in q.choices %}
+          <label class="choice"><input type="radio" name="q{{ q.pk }}" value="{{ forloop.counter0 }}" required><span>{{ choice }}</span></label>
+        {% endfor %}
+      </div>
+      <p class="feedback" data-feedback hidden aria-live="polite"></p>
+    </fieldset>
+  {% endfor %}
+  <div class="quiz-nav" data-lesson-nav hidden>
+    <span class="muted small">Réussi à partir de {{ pass.lesson }} %</span>
+    <button type="button" data-lesson-next disabled>Question suivante →</button>
+  </div>
+  <div class="quiz-submit" data-lesson-submit><button type="submit">Voir mon résultat</button></div>
+</form>
+{% endblock %}

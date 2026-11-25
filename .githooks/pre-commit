@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Refuse le commit si un secret est détecté dans les fichiers indexés (gitleaks, via Docker).
+# Activé par : git config core.hooksPath .githooks
+set -u
+
+refuser() { printf '\n✘ Commit refusé : %s\n\n' "$1" >&2; exit 1; }
+
+# 1. Fichiers de secrets ajoutés de force (malgré le .gitignore)
+interdits=$(git diff --cached --name-only --diff-filter=ACMR \
+  | grep -E '(^|/)(\.env(\..+)?|.+\.(pem|key|p12|pfx)|id_(rsa|ed25519))$|(^|/)secrets/' \
+  | grep -vE '(^|/)\.env\.example$')
+[ -n "$interdits" ] && refuser "fichier(s) de secrets indexé(s) :
+$interdits
+Retirez-les avec : git rm --cached <fichier>"
+
+# 2. Secrets dans le contenu indexé
+docker info >/dev/null 2>&1 \
+  || refuser "Docker n'est pas démarré, impossible de vérifier les secrets. Démarrez Docker Desktop puis recommencez."
+
+racine=$(git rev-parse --show-toplevel)
+src=$(cygpath -m "$racine" 2>/dev/null || printf '%s' "$racine")
+if ! MSYS_NO_PATHCONV=1 docker run --rm -v "$src:/repo" zricethezav/gitleaks:v8.28.0 \
+     git --pre-commit --staged --redact --no-banner -v /repo; then
+  refuser "secret détecté (détails ci-dessus). Retirez-le du fichier et utilisez une variable d'environnement (.env).
+S'il a déjà été poussé quelque part : considérez-le comme compromis et révoquez-le."
+fi

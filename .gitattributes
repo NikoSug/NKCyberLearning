@@ -1,0 +1,27 @@
+# Fins de ligne LF forcées : les scripts et fichiers de configuration
+# s'exécutent dans des conteneurs Linux (un CRLF casse les scripts shell).
+* text=auto eol=lf
+*.pdf binary
+*.png binary
+*.jpg binary
+# Scripts Windows : CRLF requis par cmd.exe
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Archive livrée aux clients (scripts/publier-version.sh, « git archive ») : sans les outils de développement
+# ni ceux de l'éditeur. Ces fichiers restent dans le dépôt, sur toutes les branches.
+.claude/                    export-ignore
+.github/                    export-ignore
+CLAUDE.md                   export-ignore
+dev.cmd                     export-ignore
+docker-compose.dev.yml      export-ignore
+requirements-dev.txt        export-ignore
+requirements-dev.in         export-ignore
+scripts/verrouiller-dependances.sh export-ignore
+scripts/dev.ps1             export-ignore
+scripts/ia-agent.ps1        export-ignore
+scripts/publier-version.sh  export-ignore
+scripts/publier-contenus.sh export-ignore
+docs/developpement.md       export-ignore
+docs/publier-une-mise-a-jour.md export-ignore
+.githooks/                 export-ignore

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Lien pour {{ target.username }} — {{ instance_name }}{% endblock %}
+{% block content %}
+<section class="card narrow invitation">
+  <h1>{% if new %}Compte « {{ target.username }} » créé{% else %}Nouveau lien pour {{ target.username }}{% endif %}</h1>
+  {% if sent %}
+    <p class="flash flash-success">Le lien a été envoyé à {{ target.email }}.</p>
+  {% else %}
+    <p>Transmettez ce lien à {{ target.username }} par un canal sûr (messagerie de l'organisation, en main propre) :
+      il permet de choisir {% if new %}son{% else %}un nouveau{% endif %} mot de passe.</p>
+  {% endif %}
+  <label for="lien">Lien (valable {{ days }} jours, un seul usage)</label>
+  <input type="text" id="lien" value="{{ link }}" readonly>
+  <p class="small muted">Ce lien ne sera plus affiché. S'il se perd, générez-en un autre depuis la liste des utilisateurs ;
+    {% if target.is_privileged %}à la première connexion, la double authentification sera demandée.{% endif %}</p>
+  <a class="button" href="{% url 'accounts:user_list' %}">Retour aux utilisateurs</a>
+</section>
+{% endblock %}

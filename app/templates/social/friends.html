@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Mes amis — {{ instance_name }}{% endblock %}
+{% block content %}
+<header class="dash-head">
+  <div>
+    <p class="eyebrow">{{ friend_count }} ami{% if friend_count > 1 %}s{% endif %}</p>
+    <h1>Mes amis</h1>
+  </div>
+  <form method="post" action="{% url 'social:invite' %}" class="dash-search">
+    {% csrf_token %}
+    <input type="text" name="username" placeholder="Pseudo d'un ami" aria-label="Pseudo de la personne à inviter"
+           maxlength="150" autocomplete="off" required>
+    <button type="submit">Inviter</button>
+  </form>
+</header>
+
+{% if incoming %}
+  <section class="card invitations">
+    <h2>Invitations reçues <span class="count">{{ incoming|length }}</span></h2>
+    {% for invitation in incoming %}
+      <div class="person">
+        {% include "progression/_avatar.html" with avatar=None name=invitation.requester.username size="md" %}
+        <div class="person-body"><strong>{{ invitation.requester.username }}</strong>
+          <span class="muted small">vous invite · {{ invitation.created_at|timesince }}</span></div>
+        <form method="post" action="{% url 'social:accept' invitation.pk %}" class="inline">{% csrf_token %}<button type="submit" class="small">Accepter</button></form>
+        <form method="post" action="{% url 'social:decline' invitation.pk %}" class="inline">{% csrf_token %}<button type="submit" class="small secondary">Refuser</button></form>
+      </div>
+    {% endfor %}
+  </section>
+{% endif %}
+
+<section class="card">
+  <div class="card-head">
+    <h2>Classement de la semaine</h2>
+    <span class="muted small">XP gagnés depuis le lundi {{ week_start|date:"j F" }}</span>
+  </div>
+  <ol class="leaderboard">
+    {% for row in rows %}
+      <li class="{% if row.is_me %}me{% endif %}{% if row.rank <= 3 and row.week_xp %} podium-{{ row.rank }}{% endif %}">
+        <span class="rank">{{ row.rank }}</span>
+        {% include "progression/_avatar.html" with avatar=row.avatar name=row.user.username size="md" frame=row.frame %}
+        <div class="person-body">
+          <strong>{{ row.user.username }}{% if row.is_me %} <span class="muted small">(vous)</span>{% endif %}</strong>
+          {% if row.profile_title %}<span class="profile-title small">{{ row.profile_title.name }}</span>{% endif %}
+          <span class="muted small">Niv. {{ row.level }} · {{ row.title }} · {{ row.total }} XP</span>
+        </div>
+        <span class="streak-chip{% if row.streak_today %} on{% elif row.streak %} risk-static{% endif %}" title="{{ row.streak }} jour{% if row.streak > 1 %}s{% endif %} de suite">🔥 {{ row.streak }}</span>
+        <span class="week-xp">{{ row.week_xp }} XP</span>
+        {% if not row.is_me %}
+          <form method="post" action="{% url 'social:remove' row.user.pk %}" class="inline" data-confirm="Retirer {{ row.user.username }} de vos amis ?">
+            {% csrf_token %}<button type="submit" class="icon" title="Retirer de mes amis" aria-label="Retirer {{ row.user.username }} de mes amis">✕</button>
+          </form>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ol>
+  {% if not friend_count %}
+    <p class="muted">Invitez des collègues avec leur pseudo pour comparer vos progrès chaque semaine. Seuls vos amis voient votre niveau, votre série et vos XP.</p>
+  {% endif %}
+</section>
+
+{% if outgoing %}
+  <h2 class="group-title">Invitations envoyées <span class="count">{{ outgoing|length }}</span></h2>
+  <section class="card">
+    {% for invitation in outgoing %}
+      <div class="person">
+        {% include "progression/_avatar.html" with avatar=None name=invitation.addressee.username size="sm" %}
+        <div class="person-body"><strong>{{ invitation.addressee.username }}</strong>
+          <span class="muted small">en attente · {{ invitation.created_at|timesince }}</span></div>
+        <form method="post" action="{% url 'social:cancel' invitation.pk %}" class="inline">{% csrf_token %}<button type="submit" class="small secondary">Annuler</button></form>
+      </div>
+    {% endfor %}
+  </section>
+{% endif %}
+{% endblock %}

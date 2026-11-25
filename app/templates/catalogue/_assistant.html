@@ -1,0 +1,41 @@
+<button type="button" class="assistant-toggle" data-assistant-open aria-controls="assistant" aria-expanded="false">💬 Une question ?</button>
+<aside class="assistant" id="assistant" data-assistant data-url="{% if guide.slug %}{% url 'catalogue:guide_ask' guide.slug %}{% else %}{% url 'catalogue:assistant_ask' %}{% endif %}" hidden aria-label="{% if guide.slug %}Assistant de lecture{% else %}Assistant cyber{% endif %}">
+  {% csrf_token %}
+  <header class="assistant-head">
+    <div>
+      <strong>{% if guide.slug %}Assistant de lecture{% else %}Assistant cyber{% endif %}</strong>
+      <p class="muted small">IA locale · {% if guide.slug %}répond à partir de ce guide{% else %}questions de cybersécurité{% endif %}</p>
+    </div>
+    <button type="button" class="icon" data-assistant-close title="Fermer" aria-label="Fermer l'assistant">✕</button>
+  </header>
+  <div class="assistant-log" data-assistant-log aria-live="polite">
+    {% if guide.slug %}
+    <p class="muted small">Un mot, une recommandation, un passage pas clair dans « {{ guide.title|truncatechars:70 }} » ? Posez votre question.
+      {% if listening %}Elle porte en priorité sur le chapitre en cours d'écoute.{% else %}Vous pouvez aussi coller le passage concerné.{% endif %}</p>
+    <div class="assistant-suggestions" data-assistant-suggestions>
+      {% if listening %}<button type="button" class="small secondary" data-assistant-suggest>Explique-moi simplement ce chapitre</button>{% endif %}
+      <button type="button" class="small secondary" data-assistant-suggest>Quels sont les points essentiels à retenir ?</button>
+      <button type="button" class="small secondary" data-assistant-suggest>Donne-moi un exemple concret</button>
+    </div>
+    {% else %}
+    <p class="muted small">Un terme, une notion, une bonne pratique de cybersécurité à éclaircir ? Posez votre question.
+      Sur la page d'un guide, l'assistant s'appuie sur son texte.</p>
+    <div class="assistant-suggestions" data-assistant-suggestions>
+      <button type="button" class="small secondary" data-assistant-suggest>Qu'est-ce que la défense en profondeur ?</button>
+      <button type="button" class="small secondary" data-assistant-suggest>C'est quoi l'authentification multifacteur ?</button>
+      <button type="button" class="small secondary" data-assistant-suggest>Comment reconnaître un e-mail d'hameçonnage ?</button>
+    </div>
+    {% endif %}
+  </div>
+  <form class="assistant-form" data-assistant-form>
+    <details data-assistant-passage>
+      <summary class="small">Passage concerné (facultatif)</summary>
+      <textarea name="passage" rows="3" maxlength="1500" placeholder="Collez ou sélectionnez le passage qui pose problème"></textarea>
+    </details>
+    <div class="assistant-send">
+      <textarea name="question" rows="2" maxlength="600" required placeholder="Ex. : que veut dire « DMZ » ?" aria-label="Votre question"></textarea>
+      <button type="submit">Envoyer</button>
+    </div>
+  </form>
+  <p class="assistant-note muted small">Réponses générées par une IA : elles peuvent contenir des erreurs, le guide fait foi.</p>
+</aside>

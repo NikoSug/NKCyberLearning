@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Programmes d'examen — {{ instance_name }}{% endblock %}
+{% block content %}
+{% include "catalogue/_catalogue_tabs.html" %}
+
+<p class="muted">Domaines officiels de chaque examen et leur poids : cochez-les au fil de votre préparation.</p>
+{% for r in referentials %}{% include "catalogue/_referential_item.html" %}{% empty %}
+  <p class="empty-state">Aucun programme d'examen ne correspond à ces filtres.</p>
+{% endfor %}
+<p class="source-note">Les noms de certification sont des marques de leurs détenteurs (ISC2, ISACA, CompTIA, EC-Council, OffSec, AWS…) ;
+  {{ instance_name }} n'est affilié à aucun d'eux ni approuvé par eux. Les informations sont résumées à titre indicatif : la page officielle de chaque certification fait foi.</p>
+{% endblock %}

@@ -1,0 +1,14 @@
+{% load search_text %}<div class="item">
+  <div class="item-body">
+    <a href="{{ guide.get_absolute_url }}" class="item-title">{% if words %}{{ guide.title|highlight:words }}{% else %}{{ guide.title }}{% endif %}</a>
+    <p class="meta">
+      <span class="level level-{{ guide.level }}">{{ guide.get_level_display }}</span>
+      <span>{{ guide.duration_display }}</span>
+      {% if guide.category %}<span>{{ guide.category.name }}</span>{% endif %}
+      {% if guide.has_audio %}<a class="tag audio" href="{% url 'catalogue:guide_listen' guide.slug %}" title="Version audio disponible : écouter le guide">🎧 Audio</a>{% endif %}
+      {% if guide.quiz_series %}<span class="tag quiz" title="Test de connaissances : {{ guide.quiz_series }} série{{ guide.quiz_series|pluralize }} de questions">QCM · {{ guide.quiz_series }} série{{ guide.quiz_series|pluralize }}</span>{% endif %}
+      {% if guide.language != "fr" %}<span>{{ guide.get_language_display }}</span>{% endif %}
+    </p>
+  </div>
+  {% include "catalogue/_add_button.html" with doc=guide kind="guide" %}
+</div>

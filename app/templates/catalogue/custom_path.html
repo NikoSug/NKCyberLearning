@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}{{ path.title }} — Parcours — {{ instance_name }}{% endblock %}
+{% block content %}
+<p class="back-link"><a href="{% url 'catalogue:path_list' %}">← Tous les parcours</a></p>
+<header class="dash-head">
+  <div>
+    <p class="eyebrow">Parcours sur mesure · {{ path.get_level_display }} · {{ total }} guide{{ total|pluralize }}{% if path.category %} · {{ path.category.name }}{% endif %}</p>
+    <h1>{{ path.title }}</h1>
+    {% if path.description %}<p class="muted">{{ path.description }}</p>{% endif %}
+  </div>
+  <div class="path-summary">
+    <span class="small"><strong>{{ read }}</strong> / {{ total }} lus ({{ percent }} %)</span>
+    <progress class="progress" value="{{ read }}" max="{{ total|default:1 }}" aria-label="{{ percent }} % lu">{{ percent }} %</progress>
+    {% if to_add %}
+      <form method="post" action="{% url 'catalogue:custom_path_add' path.slug %}">{% csrf_token %}
+        <button type="submit" class="small">+ Ajouter tout le parcours à ma lecture</button>
+      </form>
+    {% else %}<span class="badge listed">Tout est dans ma lecture</span>{% endif %}
+  </div>
+</header>
+
+{% if next_step %}
+  <section class="card offer next-step">
+    <span class="bonus-icon" aria-hidden="true">➡️</span>
+    <div>
+      <p class="eyebrow">Prochaine étape</p>
+      <h2><a href="{{ next_step.item.get_absolute_url }}">{{ next_step.item.title }}</a></h2>
+      {% if next_step.note %}<p class="small">{{ next_step.note }}</p>{% endif %}
+    </div>
+  </section>
+{% endif %}
+
+<ol class="lesson-path">
+  {% for step in steps %}
+    <li class="lesson-step {% if step.item.finished_at %}done{% else %}open{% endif %}">
+      <span class="lesson-mark" aria-hidden="true">{% if step.item.finished_at %}✓{% else %}{{ forloop.counter }}{% endif %}</span>
+      <div class="lesson-info">
+        <a class="lesson-name" href="{{ step.item.get_absolute_url }}">{{ step.item.title }}</a>
+        <span class="muted small">{% if step.note %}{{ step.note }} · {% endif %}{{ step.item.get_level_display }} · {{ step.item.duration_display }}</span>
+      </div>
+      <span class="small lesson-status">{% if step.item.finished_at %}<span class="ok-text">Lu</span>{% elif step.item.in_list %}Dans ma lecture{% endif %}</span>
+    </li>
+  {% empty %}
+    <li class="empty-state">Ce parcours n'a pas encore d'étape.</li>
+  {% endfor %}
+</ol>
+{% endblock %}

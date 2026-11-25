@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% load course_text %}
+{% block title %}{{ lesson.title }} — {{ course.title }} — {{ instance_name }}{% endblock %}
+{% block content %}
+<p class="back-link"><a href="{{ course.get_absolute_url }}">← {{ course.title }}</a></p>
+<article class="lesson">
+  <header>
+    <p class="eyebrow">Leçon {{ lesson.position }} sur {{ lessons|length }} · ~ {{ lesson.minutes }} min de lecture</p>
+    <h1>{{ lesson.title }}</h1>
+    {% if lesson.objective %}<p class="lesson-objective">🎯 {{ lesson.objective }}</p>{% endif %}
+  </header>
+  <div class="lesson-body">{{ lesson.body|lesson_html:glossary_entries }}</div>
+  {% if lesson.key_points %}
+    <aside class="card key-points">
+      <h2>📌 À retenir</h2>
+      <ul>{% for point in lesson.key_points %}<li>{{ point }}</li>{% endfor %}</ul>
+    </aside>
+  {% endif %}
+  {% if lesson.sources %}<p class="muted small">Sources : {{ lesson.sources }} (ANSSI).</p>{% endif %}
+</article>
+
+<section class="card offer lesson-next">
+  <span class="bonus-icon" aria-hidden="true">✍️</span>
+  <div>
+    <h2>{% if lesson.state == "done" %}Leçon réussie{% else %}Vérifiez ce que vous avez retenu{% endif %}</h2>
+    <p class="muted small">{{ question_count }} question{{ question_count|pluralize }}, correction après chaque réponse.
+      {% if lesson.state != "done" %}Il faut {{ pass.lesson }} % de bonnes réponses pour ouvrir la leçon suivante.{% else %}Vous pouvez refaire le quiz pour vous entraîner.{% endif %}</p>
+  </div>
+  <a class="button" href="{% url 'courses:lesson_quiz' course.slug lesson.position %}">{% if lesson.state == "done" %}Refaire le quiz{% else %}Faire le quiz{% endif %}</a>
+</section>
+{% endblock %}

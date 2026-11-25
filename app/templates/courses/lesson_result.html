@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Résultat — {{ lesson.title }} — {{ instance_name }}{% endblock %}
+{% block content %}
+<p class="back-link"><a href="{{ course.get_absolute_url }}">← {{ course.title }}</a></p>
+<header class="dash-head">
+  <p class="eyebrow">Quiz · leçon {{ lesson.position }}</p>
+  <h1>{{ lesson.title }}</h1>
+</header>
+
+<section class="card result">
+  <div class="score-ring {% if passed %}good{% else %}bad{% endif %}">
+    <div>{{ percent }} %<small>{{ score }} / {{ total }}</small></div>
+  </div>
+  <div class="result-body">
+    <p><strong>{% if passed and score == total %}Sans faute, bravo !{% elif passed %}Leçon réussie !{% else %}Pas encore : il faut {{ pass.lesson }} % de bonnes réponses.{% endif %}</strong></p>
+    <p class="muted">{% if passed %}{% if next_lesson %}La leçon suivante est ouverte.{% else %}Toutes les leçons sont faites ? L'examen final vous attend sur la page du cours.{% endif %}
+      {% else %}Relisez la leçon en vous aidant des explications ci-dessous, puis réessayez.{% endif %}</p>
+  </div>
+  {% if gain %}
+    <div class="xp-gain{% if gain.level_up %} level-up{% endif %}">
+      <span class="xp-gain-value">+{{ gain.xp }} XP{% if gain.doubled %} <small>(double XP)</small>{% endif %}</span>
+      {% if gain.emeralds %}<span class="emerald-gain">{% include "progression/_gem.html" %}+{{ gain.emeralds }} émeraude{{ gain.emeralds|pluralize }}</span>{% endif %}
+      {% if gain.level_up %}<span>Niveau {{ gain.level_after }} : {{ gain.title }} !</span>
+      {% elif not gain.xp %}<span class="muted">XP déjà obtenus pour cette leçon.</span>{% endif %}
+    </div>
+  {% endif %}
+</section>
+
+<p class="actions">
+  {% if next_lesson %}<a class="button" href="{{ next_lesson.get_absolute_url }}">Leçon suivante : {{ next_lesson.title|truncatechars:50 }}</a>
+  {% elif passed %}<a class="button" href="{{ course.get_absolute_url }}">Retour au cours</a>{% endif %}
+  <a class="button secondary" href="{% url 'courses:lesson_quiz' course.slug lesson.position %}">Refaire le quiz</a>
+  <a class="button secondary" href="{{ lesson.get_absolute_url }}">Revoir la leçon</a>
+</p>
+
+{% for q in questions %}
+  <section class="card question {% if q.given == q.answer %}correct{% else %}wrong{% endif %}">
+    <span class="verdict">{% if q.given == q.answer %}✓ Bonne réponse{% elif q.given is None %}✕ Sans réponse{% else %}✕ Mauvaise réponse{% endif %}</span>
+    <p class="question-text"><span class="ref">{{ forloop.counter }}</span><span>{{ q.text }}</span></p>
+    <ul class="choices">
+      {% for choice in q.choices %}
+        <li class="{% if forloop.counter0 == q.answer %}is-answer{% elif forloop.counter0 == q.given %}is-given{% endif %}">
+          <span>{{ choice }}</span>
+          {% if forloop.counter0 == q.answer %}<span class="badge read">Bonne réponse</span>{% elif forloop.counter0 == q.given %}<span class="badge">Votre réponse</span>{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+    {% if q.explanation %}<p class="explanation">{{ q.explanation }}</p>{% endif %}
+  </section>
+{% endfor %}
+{% endblock %}

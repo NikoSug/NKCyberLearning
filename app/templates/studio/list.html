@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}{{ type.plural }} — Atelier de création — {{ instance_name }}{% endblock %}
+{% block content %}
+<p class="back-link"><a href="{% url 'studio:home' %}">← Atelier de création</a></p>
+<header class="dash-head">
+  <div>
+    <p class="eyebrow">Atelier de création</p>
+    <h1><span aria-hidden="true">{{ type.icon }}</span> {{ type.plural }}</h1>
+    <p class="muted">{{ type.description }}</p>
+  </div>
+  <div class="head-actions"><a class="button" href="{{ type.new_url }}">+ {{ type.new_label }}</a></div>
+</header>
+
+<form method="get" class="filters">
+  <input type="hidden" name="etat" value="{{ bucket }}">
+  <input type="search" name="q" value="{{ query }}" placeholder="Rechercher" aria-label="Rechercher">
+  <button type="submit" class="secondary">Rechercher</button>
+  {% if query %}<a class="reset" href="?etat={{ bucket }}">Effacer</a>{% endif %}
+</form>
+
+<nav class="tabs" aria-label="État">
+  {% for value, label in buckets %}{% if type.key != "domaine" or value == "publies" %}
+    <a href="?etat={{ value }}{% if query %}&amp;q={{ query|urlencode }}{% endif %}"{% if value == bucket %} aria-current="page"{% endif %}>{{ label }}
+      {% for key, n in counts.items %}{% if key == value %}<span class="count">{{ n }}</span>{% endif %}{% endfor %}</a>
+  {% endif %}{% endfor %}
+</nav>
+
+{% for entry in entries %}
+  <a class="item review-row studio-row" href="{{ entry.url }}">
+    <div class="item-body">
+      <span class="item-title">{{ entry.title }}</span>
+      <p class="meta">{% for m in entry.meta %}{% if m %}<span>{{ m }}</span>{% endif %}{% endfor %}
+        {% if entry.author and entry.author != user %}<span>par {{ entry.author.username }}</span>{% endif %}
+        {% if entry.when %}<span>{{ entry.when|date:"d/m/Y" }}</span>{% endif %}</p>
+    </div>
+    <span class="status {% if bucket == 'publies' %}done{% elif bucket == 'relecture' %}review{% else %}idle{% endif %}">{% if entry.status %}{{ entry.status }}{% else %}{% for key, label in status_labels.items %}{% if key == bucket %}{{ label }}{% endif %}{% endfor %}{% endif %}</span>
+  </a>
+{% empty %}
+  <p class="empty-state">{% if query %}Aucun résultat pour « {{ query }} ».{% elif bucket == "brouillons" %}Aucun brouillon : cliquez sur « + Ajouter » pour commencer.{% elif bucket == "relecture" %}Rien à relire pour l'instant.{% else %}Rien de publié ici pour l'instant.{% endif %}</p>
+{% endfor %}
+{% endblock %}

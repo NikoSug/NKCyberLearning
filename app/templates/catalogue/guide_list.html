@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Guides ANSSI — {{ instance_name }}{% endblock %}
+{% block content %}
+{% include "catalogue/_catalogue_tabs.html" %}
+
+<p class="muted">{{ guides|length }} guide{{ guides|length|pluralize }}{% if english_guides %} · {{ english_guides|length }} en anglais{% endif %}</p>
+{% for guide in guides %}
+  {% ifchanged guide.category_id %}<h2 class="group-title">{{ guide.category.name|default:"Sans domaine" }}</h2>{% endifchanged %}
+  {% include "catalogue/_guide_item.html" %}
+{% empty %}
+  <p class="empty-state">Aucun guide ne correspond à ces filtres.</p>
+{% endfor %}
+
+{% if english_guides %}
+  <details class="english">
+    <summary>Versions anglaises ({{ english_guides|length }})</summary>
+    {% for guide in english_guides %}{% include "catalogue/_guide_item.html" %}{% endfor %}
+  </details>
+{% endif %}
+{% endblock %}

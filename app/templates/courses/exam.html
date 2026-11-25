@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Examen — {{ course.title }} — {{ instance_name }}{% endblock %}
+{% block content %}
+<p class="back-link"><a href="{{ course.get_absolute_url }}">← {{ course.title }}</a></p>
+<header class="dash-head">
+  <p class="eyebrow">Examen final · {{ questions|length }} questions · réussi à partir de {{ pass.exam }} %</p>
+  <h1>{{ course.title }}</h1>
+</header>
+
+{% if attempt %}
+  {% if attempt.passed %}
+    {% include "catalogue/_quiz_results.html" with message="Examen réussi : le cours est validé. Bravo !" %}
+  {% else %}
+    {% include "catalogue/_quiz_results.html" with message="Pas encore validé : revoyez les leçons concernées puis repassez l'examen quand vous voulez." %}
+  {% endif %}
+  <p class="actions">
+    <a class="button" href="{{ course.get_absolute_url }}">Retour au cours</a>
+    <a class="button secondary" href="{% url 'courses:exam' course.slug %}">Repasser l'examen</a>
+    <a class="button secondary" href="{% url 'courses:course_list' %}">Autres cours</a>
+  </p>
+{% else %}
+  {% include "catalogue/_quiz_form.html" %}
+{% endif %}
+{% endblock %}

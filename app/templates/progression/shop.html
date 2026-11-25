@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}Boutique — {{ instance_name }}{% endblock %}
+{% block content %}
+<header class="dash-head">
+  <div class="shop-me">
+    {% include "progression/_avatar.html" with avatar=summary.avatar name=user.username size="xl" frame=summary.frame %}
+    <div>
+      <p class="eyebrow">Niveau {{ summary.level }} · {{ summary.title }}</p>
+      <h1>Boutique</h1>
+      {% if summary.profile_title %}<p class="profile-title">{{ summary.profile_title.name }}</p>{% endif %}
+      <p class="muted">Dépensez vos émeraudes. Chaque article se débloque à un niveau : plus vous progressez, plus la boutique s'agrandit.</p>
+      <p class="links small"><a href="{% url 'progression:overview' %}">Ma progression</a><a href="{% url 'social:friends' %}">Mes amis</a><a href="{% url 'accounts:password_change' %}">Changer de mot de passe</a></p>
+    </div>
+  </div>
+  <div class="wallet">
+    <span class="wallet-label">Mes émeraudes</span>
+    <span class="wallet-value">{% include "progression/_gem.html" %}{{ summary.emeralds }}</span>
+    <a class="small" href="{% url 'progression:overview' %}#emeraudes">Comment en gagner ?</a>
+  </div>
+</header>
+
+<nav class="shop-nav" aria-label="Rayons de la boutique">
+  <a href="#bonus">Bonus</a><a href="#avatars">Avatars</a><a href="#cadre">Cadres</a><a href="#titre">Titres</a><a href="#theme">Thèmes</a>
+</nav>
+
+{% for section in sections %}{% if section.category == "bonus" %}
+<section id="bonus" class="shop-section">
+  <h2>{{ section.label }}</h2>
+  <p class="muted small">{{ section.help }}</p>
+  <div class="shop-grid wide">
+    {% for entry in section.items %}{% with item=entry.item %}
+      <article class="shop-item bonus{% if entry.locked %} locked{% endif %}">
+        <span class="bonus-icon" aria-hidden="true">{% if item.key == freeze_item %}❄️{% elif item.key == double_item %}🧪{% else %}🔁{% endif %}</span>
+        <p class="shop-name">{{ item.name }}</p>
+        <p class="muted small">{{ item.description }}</p>
+        {% if item.key == freeze_item %}<p class="small stock">En réserve : {{ summary.freezes }} / {{ item.stock_max }}</p>{% endif %}
+        {% if item.key == double_item and summary.double_xp %}<p class="small stock active">Active jusqu'à {{ summary.double_xp_until|time:"H:i" }}</p>{% endif %}
+        {% if entry.locked %}
+          <span class="shop-lock">🔒 Niveau {{ item.min_level }}</span>
+        {% elif item.key == second_review_item %}
+          <a class="button small secondary" href="{% url 'catalogue:daily_review' %}">{% include "progression/_gem.html" %}{{ item.price }} · depuis la révision</a>
+        {% else %}
+          <form method="post" action="{% url 'progression:buy_item' %}" data-confirm="Acheter « {{ item.name }} » pour {{ item.price }} émeraudes ?">
+            {% csrf_token %}<input type="hidden" name="item" value="{{ item.key }}"><input type="hidden" name="section" value="bonus">
+            <button type="submit" class="small buy"{% if not entry.affordable %} disabled title="Pas assez d'émeraudes"{% elif item.key == freeze_item and summary.freezes >= item.stock_max %} disabled title="Réserve pleine"{% elif item.key == double_item and summary.double_xp %} disabled title="Déjà active"{% endif %}>{% include "progression/_gem.html" %}{{ item.price }}</button>
+          </form>
+        {% endif %}
+      </article>
+    {% endwith %}{% endfor %}
+  </div>
+</section>
+{% endif %}{% endfor %}
+
+<section id="avatars" class="shop-section">
+  <h2>Avatars</h2>
+  {% if summary.avatar %}
+    <form method="post" action="{% url 'progression:equip_avatar' %}" class="inline">
+      {% csrf_token %}<input type="hidden" name="avatar" value="">
+      <button type="submit" class="link small">Revenir à l'initiale de mon pseudo</button>
+    </form>
+  {% endif %}
+  {% for group in groups %}
+    <h3 class="group-title rarity-title rarity-{{ group.rarity.key }}">{{ group.rarity.label }}{% if group.rarity.price %} · {{ group.rarity.price }} émeraudes · dès le niveau {{ group.rarity.min_level }}{% endif %}</h3>
+    <div class="shop-grid">
+      {% for item in group.items %}
+        <article class="shop-item rarity-{{ item.avatar.rarity.key }}{% if item.equipped %} equipped{% elif item.owned %} owned{% elif item.locked %} locked{% endif %}">
+          {% include "progression/_avatar.html" with avatar=item.avatar size="lg" %}
+          <p class="shop-name">{{ item.avatar.name }}</p>
+          {% if item.equipped %}
+            <span class="badge read">Équipé</span>
+          {% elif item.owned %}
+            <form method="post" action="{% url 'progression:equip_avatar' %}">
+              {% csrf_token %}<input type="hidden" name="avatar" value="{{ item.avatar.key }}">
+              <button type="submit" class="small secondary">Choisir</button>
+            </form>
+          {% elif item.locked %}
+            <span class="shop-lock">🔒 Niveau {{ item.avatar.min_level }}</span>
+          {% else %}
+            <form method="post" action="{% url 'progression:buy_avatar' %}" data-confirm="Acheter « {{ item.avatar.name }} » pour {{ item.avatar.price }} émeraudes ?">
+              {% csrf_token %}<input type="hidden" name="avatar" value="{{ item.avatar.key }}">
+              <button type="submit" class="small buy"{% if not item.affordable %} disabled title="Pas assez d'émeraudes"{% endif %}>{% include "progression/_gem.html" %}{{ item.avatar.price }}</button>
+            </form>
+          {% endif %}
+        </article>
+      {% endfor %}
+    </div>
+  {% endfor %}
+</section>
+
+{% for section in sections %}{% if section.category != "bonus" %}
+<section id="{{ section.category }}" class="shop-section">
+  <div class="card-head">
+    <h2>{{ section.label }}</h2>
+    {% for entry in section.items %}{% if entry.equipped %}
+      <form method="post" action="{% url 'progression:equip_item' %}" class="inline">
+        {% csrf_token %}<input type="hidden" name="category" value="{{ section.category }}"><input type="hidden" name="item" value="">
+        <button type="submit" class="link small">{% if section.category == "theme" %}Suivre le réglage de l'ordinateur (clair ou sombre){% elif section.category == "cadre" %}Retirer le cadre{% else %}Retirer le titre{% endif %}</button>
+      </form>
+    {% endif %}{% endfor %}
+  </div>
+  <p class="muted small">{{ section.help }}</p>
+  <div class="shop-grid{% if section.category != 'cadre' %} wide{% endif %}">
+    {% for entry in section.items %}{% with item=entry.item %}
+      <article class="shop-item{% if entry.equipped %} equipped{% elif entry.owned %} owned{% elif entry.locked %} locked{% endif %}">
+        {% if section.category == "cadre" %}
+          {% include "progression/_avatar.html" with avatar=summary.avatar name=user.username size="lg" frame=item %}
+        {% elif section.category == "theme" %}
+          <span class="theme-swatch swatch-{{ item.css }}" aria-hidden="true"><i></i><i></i><i></i></span>
+        {% else %}
+          <span class="profile-title preview">{{ item.name }}</span>
+        {% endif %}
+        {% if section.category != "titre" %}<p class="shop-name">{{ item.name }}</p>{% endif %}
+        {% if item.description %}<p class="muted small">{{ item.description }}</p>{% endif %}
+        {% if entry.equipped %}
+          <span class="badge read">Équipé</span>
+        {% elif entry.owned %}
+          <form method="post" action="{% url 'progression:equip_item' %}">
+            {% csrf_token %}<input type="hidden" name="category" value="{{ section.category }}"><input type="hidden" name="item" value="{{ item.key }}">
+            <button type="submit" class="small secondary">Choisir</button>
+          </form>
+        {% elif entry.locked %}
+          <span class="shop-lock">🔒 Niveau {{ item.min_level }}</span>
+        {% else %}
+          <form method="post" action="{% url 'progression:buy_item' %}" data-confirm="Acheter « {{ item.name }} » pour {{ item.price }} émeraudes ?">
+            {% csrf_token %}<input type="hidden" name="item" value="{{ item.key }}"><input type="hidden" name="section" value="{{ section.category }}">
+            <button type="submit" class="small buy"{% if not entry.affordable %} disabled title="Pas assez d'émeraudes"{% endif %}>{% include "progression/_gem.html" %}{{ item.price }}</button>
+          </form>
+        {% endif %}
+      </article>
+    {% endwith %}{% endfor %}
+  </div>
+</section>
+{% endif %}{% endfor %}
+
+{% if history %}
+  <h2 class="group-title">Mes dernières émeraudes</h2>
+  <section class="card">
+    {% for event in history %}
+      <div class="xp-event">
+        <span class="emerald-amount{% if event.amount < 0 %} spent{% endif %}">{% if event.amount > 0 %}+{% endif %}{{ event.amount }}</span>
+        <span class="xp-label">{{ event.label }}</span>
+        <span class="muted small">{{ event.created_at|date:"d/m H:i" }}</span>
+      </div>
+    {% endfor %}
+  </section>
+{% endif %}
+{% endblock %}

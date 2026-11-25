@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% load course_text %}
+{% block title %}{% if writing %}Rédaction{% else %}Relecture{% endif %} — {{ course.title }} — {{ instance_name }}{% endblock %}
+{% block content %}
+<p class="back-link"><a href="{{ back_url }}">← {{ back_label }}</a></p>
+<header class="dash-head">
+  <div>
+    <p class="eyebrow">🎓 {{ course.get_kind_display }} · {{ course.source_title }}{% if course.author %} · par {{ course.author.username }}{% elif course.llm_model %} · généré par {{ course.llm_model }}{% endif %}</p>
+    <h1>{{ course.title }}</h1>
+    {% if course.brief %}<p class="muted small">🎯 Consignes : {{ course.brief|truncatechars:240 }}</p>{% endif %}
+  </div>
+</header>
+
+<section class="editor-bar{% if problems and editable %} has-problems{% endif %}">
+  {% include "studio/_status.html" with code=course.status label=course.get_status_display hint=hint %}
+  <div class="editor-bar-actions">
+    {% if editable %}
+      {% if writing and not manager %}
+        <form method="post" action="{% url 'courses:review_course_action' course.pk %}">{% csrf_token %}
+          <input type="hidden" name="action" value="soumettre"><input type="hidden" name="etape" value="{{ step }}">
+          <button type="submit"{% if problems %} disabled title="{{ problems|join:' ; ' }}"{% endif %}>Soumettre à la relecture</button></form>
+      {% endif %}
+      {% if manager and course.status == "publie" %}
+        <a class="button secondary" href="{{ course.get_absolute_url }}">Voir le cours publié ↗</a>
+      {% elif manager %}
+        <form method="post" action="{% url 'courses:review_course_action' course.pk %}">{% csrf_token %}
+          <input type="hidden" name="action" value="publier">
+          <button type="submit"{% if problems %} disabled title="{{ problems|join:' ; ' }}"{% endif %}>Publier</button></form>
+      {% endif %}
+      {% if not writing and manager and course.author %}
+        <form method="post" action="{% url 'courses:review_course_action' course.pk %}">{% csrf_token %}
+          <input type="hidden" name="action" value="renvoyer"><button type="submit" class="secondary">Renvoyer au rédacteur</button></form>
+      {% endif %}
+      {% if course.status != "publie" and ai_enabled %}
+      <form method="post" action="{% url 'courses:review_course_action' course.pk %}" data-confirm="Faire réécrire entièrement ce cours par l'IA ? Les leçons et questions actuelles seront perdues.">{% csrf_token %}
+        <input type="hidden" name="action" value="relancer"><button type="submit" class="secondary">✨ Réécrire avec l'IA</button></form>
+      {% endif %}
+      {% if writing %}
+        <form method="post" action="{% url 'courses:review_course_action' course.pk %}" data-confirm="Supprimer définitivement ce cours et tout son contenu ?">{% csrf_token %}
+          <input type="hidden" name="action" value="supprimer"><button type="submit" class="link small">Supprimer</button></form>
+      {% elif manager and course.status == "a_relire" %}
+        <form method="post" action="{% url 'courses:review_course_action' course.pk %}" data-confirm="Abandonner ce cours ?">{% csrf_token %}
+          <input type="hidden" name="action" value="abandonner"><button type="submit" class="link small">Abandonner</button></form>
+      {% endif %}
+    {% elif course.status == "publie" %}
+      <a class="button secondary" href="{{ course.get_absolute_url }}">Voir le cours publié ↗</a>
+    {% endif %}
+  </div>
+</section>
+
+{% if editable %}
+<details class="card course-meta-edit"{% if not lessons %} open{% endif %}>
+  <summary><strong>Titre, présentation{% if course.author %} et consignes{% endif %}</strong></summary>
+  <form method="post" action="{% url 'courses:review_course_action' course.pk %}" class="review-question">{% csrf_token %}
+    <input type="hidden" name="action" value="enregistrer"><input type="hidden" name="etape" value="{{ step }}">
+    <label>Titre<input type="text" name="title" value="{{ course.title }}" maxlength="200"></label>
+    <label>Présentation <span class="muted">(affichée aux apprenants)</span><textarea name="summary" rows="2">{{ course.summary }}</textarea></label>
+    {% if course.author %}<label>Consignes pour l'IA <span class="muted">(de quoi parle le cours ; utilisées par chaque aide)</span><textarea name="brief" rows="3">{{ course.brief }}</textarea></label>{% endif %}
+    <div class="actions"><button type="submit" class="small">Enregistrer</button></div>
+  </form>
+</details>
+{% endif %}
+
+<nav class="review-map" aria-label="Étapes du cours" data-review-question>
+  <div class="review-map-cells">
+    {% for l in lessons %}
+      <a href="?etape={{ l.position }}" class="review-cell wide{% if l.question_count < min_lesson or l.position|stringformat:'s' in prereview_steps %} flagged{% endif %}{% if step == l.position|stringformat:'s' %} current{% endif %}"
+         title="Leçon {{ l.position }} : {{ l.title }} ({{ l.question_count }} questions)">Leçon {{ l.position }}</a>
+    {% endfor %}
+    <a href="?etape=examen" class="review-cell wide{% if exam_count < 5 or "examen" in prereview_steps %} flagged{% endif %}{% if step == 'examen' %} current{% endif %}" title="{{ exam_count }} questions">Examen</a>
+    {% if editable %}
+      <form method="post" action="{% url 'courses:review_course_action' course.pk %}" class="inline">{% csrf_token %}
+        <input type="hidden" name="action" value="ajouter-lecon"><button type="submit" class="review-cell wide add-cell" title="Ajouter une leçon à la fin">+ Leçon</button>
+      </form>
+    {% endif %}
+  </div>
+</nav>
+
+{% include "catalogue/_prereview_notes.html" with notes=prereview_notes %}
+
+{% if lesson %}
+  <div class="review-split">
+    <section class="card">
+      <p class="eyebrow">Leçon {{ lesson.position }} sur {{ lessons|length }} · aperçu</p>
+      <h2>{{ lesson.title }}</h2>
+      {% if lesson.objective %}<p class="lesson-objective">🎯 {{ lesson.objective }}</p>{% endif %}
+      {% if lesson.body %}<div class="lesson-body">{{ lesson.body|lesson_html }}</div>
+      {% else %}<p class="empty-state">Leçon vide : écrivez-la à droite, ou cliquez sur « Rédiger un brouillon » pour que l'IA propose un premier texte.</p>{% endif %}
+      {% if lesson.key_points %}<div class="key-points"><h3>📌 À retenir</h3><ul>{% for p in lesson.key_points %}<li>{{ p }}</li>{% endfor %}</ul></div>{% endif %}
+      <p class="muted small">Sources : {{ lesson.sources|default:"—" }}</p>
+    </section>
+    {% if editable %}
+    <form method="post" action="{% url 'courses:review_lesson' lesson.pk %}" class="card review-question" id="lecon">{% csrf_token %}
+      <p class="eyebrow">Modifier la leçon</p>
+      <label>Titre<input type="text" name="title" value="{{ lesson.title }}" maxlength="200"></label>
+      <label>Objectif<input type="text" name="objective" value="{{ lesson.objective }}" maxlength="300"></label>
+      <label>Texte <span class="muted">(« ## Titre » pour une partie, « - » pour une liste, **gras**)</span>
+        <textarea name="body" rows="18">{{ lesson.body }}</textarea></label>
+      {% include "studio/_ai_tools.html" with kind="cours" target="body" %}
+      <label>À retenir <span class="muted">(un point par ligne)</span><textarea name="key_points" rows="4">{{ key_points_text }}</textarea></label>
+      <div class="actions"><button type="submit" class="small">Enregistrer la leçon</button></div>
+    </form>
+    {% endif %}
+  </div>
+  {% if editable %}
+    <form method="post" action="{% url 'courses:review_lesson' lesson.pk %}" class="inline-end" data-confirm="Supprimer la leçon « {{ lesson.title }} » et ses questions ?">{% csrf_token %}
+      <input type="hidden" name="action" value="supprimer"><button type="submit" class="link small">Supprimer cette leçon</button>
+    </form>
+  {% endif %}
+  <h2 class="group-title">Quiz de la leçon <span class="count">{{ questions|length }}</span></h2>
+{% else %}
+  <h2 class="group-title">Examen final <span class="count">{{ questions|length }}</span></h2>
+  {% if not lessons %}<p class="empty-state">Ce cours n'a encore aucune leçon : cliquez sur « + Leçon » pour commencer.</p>{% endif %}
+{% endif %}
+
+{% if editable and lessons %}
+  <form method="post" action="{% url 'studio:ai_questions' course.pk %}" class="inline-end">{% csrf_token %}
+    <input type="hidden" name="lecon" value="{{ step }}">
+    <button type="submit" class="small secondary" data-busy="L'IA rédige les questions… (jusqu'à une minute)"{% if ai_busy %} disabled title="{{ ai_busy }}"{% endif %}>
+      ✨ {% if lesson %}Ajouter des questions par l'IA{% else %}Rédiger l'examen par l'IA{% endif %}</button>
+  </form>
+{% endif %}
+
+{% for q in questions %}
+  <form method="post" action="{% url 'courses:review_question' q.pk %}" id="q{{ q.pk }}" class="card review-question">{% csrf_token %}
+    <label>Question {{ forloop.counter }}<textarea name="text" rows="2"{% if not editable %} readonly{% endif %}>{{ q.text }}</textarea></label>
+    {% for choice in q.choices %}
+      {% if forloop.counter0 == q.answer %}<label class="answer-ok">Bonne réponse<input type="text" name="correct" value="{{ choice }}"></label>{% endif %}
+    {% endfor %}
+    {% for choice in q.choices %}
+      {% if forloop.counter0 != q.answer %}<label class="answer-ko">Mauvaise réponse<input type="text" name="wrong_{{ forloop.counter }}" value="{{ choice }}"></label>{% endif %}
+    {% endfor %}
+    <label>Explication<textarea name="explanation" rows="2">{{ q.explanation }}</textarea></label>
+    {% if editable %}
+    <div class="actions">
+      <button type="submit" name="action" value="enregistrer" class="small">Enregistrer</button>
+      <button type="submit" name="action" value="supprimer" class="small secondary" formnovalidate>Supprimer</button>
+    </div>
+    {% endif %}
+  </form>
+{% empty %}
+  <p class="empty-state">Aucune question.</p>
+{% endfor %}
+
+{% if editable and lessons or editable and lesson %}
+  <details class="card" id="nouvelle-question">
+    <summary><strong>+ Écrire une question</strong></summary>
+    <form method="post" action="{% url 'courses:add_question' course.pk %}" class="review-question">{% csrf_token %}
+      <input type="hidden" name="lecon" value="{{ step }}">
+      <label>Question<textarea name="text" rows="2" required minlength="10"></textarea></label>
+      <label class="answer-ok">Bonne réponse<input type="text" name="correct" required></label>
+      <label class="answer-ko">Mauvaise réponse<input type="text" name="wrong_1" required></label>
+      <label class="answer-ko">Mauvaise réponse<input type="text" name="wrong_2" required></label>
+      <label class="answer-ko">Mauvaise réponse <span class="muted">(facultative)</span><input type="text" name="wrong_3"></label>
+      <label>Explication <span class="muted">(pourquoi c'est la bonne réponse)</span><textarea name="explanation" rows="2"></textarea></label>
+      <div class="actions"><button type="submit" class="small">Ajouter la question</button></div>
+    </form>
+  </details>
+{% endif %}
+
+<nav class="review-steps" aria-label="Navigation entre les leçons">
+  {% if previous %}<a class="button secondary" href="?etape={{ previous }}" data-shortcut="arrowleft">← {% if previous == "examen" %}Examen{% else %}Leçon {{ previous }}{% endif %}</a>{% else %}<span></span>{% endif %}
+  {% if next %}<a class="button secondary" href="?etape={{ next }}" data-shortcut="arrowright">{% if next == "examen" %}Examen final{% else %}Leçon {{ next }}{% endif %} →</a>{% else %}<span></span>{% endif %}
+</nav>
+{% endblock %}

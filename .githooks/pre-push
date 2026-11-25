@@ -1,0 +1,13 @@
+#!/bin/sh
+# Pas de push direct sur dev ni main : tout passe par une PR (.\dev pr). GitHub ne peut pas protéger
+# les branches d'un dépôt privé gratuit, ce hook le fait sur le poste.
+# Publication d'une version (scripts/publier-version.sh) : CL_PUBLICATION=1 git push ...
+[ -n "$CL_PUBLICATION" ] && exit 0
+while read -r local_ref local_sha remote_ref remote_sha; do
+    case "$remote_ref" in
+        refs/heads/dev|refs/heads/main)
+            echo "Push direct sur ${remote_ref#refs/heads/} refusé : ouvrez une PR (.\dev pr)." >&2
+            echo "Publication d'une version : CL_PUBLICATION=1 git push ..." >&2
+            exit 1 ;;
+    esac
+done

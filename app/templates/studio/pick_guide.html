@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ type.new_label }} — Atelier de création — {{ instance_name }}{% endblock %}
+{% block content %}
+<p class="back-link"><a href="{{ type.list_url }}">← {{ type.plural }}</a></p>
+<header class="dash-head">
+  <div>
+    <p class="eyebrow">{{ type.icon }} {{ type.plural }}</p>
+    <h1>{{ type.new_label }}</h1>
+    <p class="muted">{{ type.description }}</p>
+  </div>
+</header>
+<form method="post" class="card studio-form">{% csrf_token %}
+  {% include "studio/_field.html" with field=form.guide %}
+  <p class="muted small">
+    {% if type.key == "qcm" %}Vous écrirez les 6 séries de questions (de la plus facile à la plus difficile), à la main ou avec les propositions
+      de l'IA. À la publication, elles remplacent le QCM actuel du guide s'il en a un.
+    {% elif type.key == "lexique" %}Un guide n'a qu'un lexique : s'il en a déjà un, il s'ouvre pour que vous le complétiez.
+      Sinon, vous écrirez les entrées vous-même ou les ferez relever par l'IA.
+    {% else %}Vous déposerez un fichier MP3 par chapitre. À la publication, votre enregistrement remplace la voix de synthèse du guide.{% endif %}
+  </p>
+  <div class="actions"><button type="submit">Commencer</button></div>
+</form>
+{% endblock %}

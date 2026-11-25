@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}{% if writing %}Rédaction{% else %}Relecture{% endif %} — lexique de {{ glossary.guide.title }} — {{ instance_name }}{% endblock %}
+{% block content %}
+<p class="back-link"><a href="{{ back_url }}">← {{ back_label }}</a></p>
+<header class="dash-head">
+  <div>
+    <p class="eyebrow">📖 Lexique · {{ entries|length }} entrée{{ entries|length|pluralize }}{% if glossary.author %} · par {{ glossary.author.username }}{% elif glossary.llm_model %} · généré par {{ glossary.llm_model }}{% endif %}</p>
+    <h1>{{ glossary.guide.title }}</h1>
+    <p class="links small"><a href="{{ glossary.guide.get_absolute_url }}">Fiche du guide</a>
+      {% with doc=glossary.guide.documents.first %}{% if doc and doc.file %}<a href="{% url 'catalogue:guide_read' glossary.guide.slug doc.pk %}" target="_blank" rel="noopener">Ouvrir le PDF</a>{% endif %}{% endwith %}</p>
+  </div>
+</header>
+
+<section class="editor-bar">
+  {% include "studio/_status.html" with code=glossary.status label=glossary.get_status_display hint=hint %}
+  <div class="editor-bar-actions">
+    {% if editable %}
+      {% if writing and not manager %}
+        <form method="post" action="{% url 'catalogue:glossary_review_action' glossary.pk %}">{% csrf_token %}
+          <input type="hidden" name="action" value="soumettre"><button type="submit"{% if entries|length < min_entries %} disabled title="Au moins {{ min_entries }} entrées"{% endif %}>Soumettre à la relecture</button></form>
+      {% endif %}
+      {% if manager and glossary.status == "publie" %}
+        <a class="button secondary" href="#ajouter">+ Ajouter une entrée</a>
+      {% elif manager %}
+        <form method="post" action="{% url 'catalogue:glossary_review_action' glossary.pk %}">{% csrf_token %}
+          <input type="hidden" name="action" value="publier"><button type="submit"{% if not entries %} disabled{% endif %}>Publier</button></form>
+      {% endif %}
+      {% if not writing and manager and glossary.author %}
+        <form method="post" action="{% url 'catalogue:glossary_review_action' glossary.pk %}">{% csrf_token %}
+          <input type="hidden" name="action" value="renvoyer"><button type="submit" class="secondary">Renvoyer au rédacteur</button></form>
+      {% endif %}
+      {% if glossary.status != "publie" and ai_enabled %}
+      <form method="post" action="{% url 'catalogue:glossary_review_action' glossary.pk %}" data-confirm="Faire relever les sigles et termes par l'IA ? Les entrées actuelles seront remplacées.">{% csrf_token %}
+        <input type="hidden" name="action" value="{% if writing %}generer{% else %}relancer{% endif %}"><button type="submit" class="secondary">✨ Faire relever par l'IA</button></form>
+      {% endif %}
+      {% if writing %}
+        <form method="post" action="{% url 'catalogue:glossary_review_action' glossary.pk %}" data-confirm="Supprimer ce lexique ?">{% csrf_token %}
+          <input type="hidden" name="action" value="supprimer"><button type="submit" class="link small">Supprimer</button></form>
+      {% elif glossary.status == "a_relire" %}
+        <form method="post" action="{% url 'catalogue:glossary_review_action' glossary.pk %}" data-confirm="Abandonner ce lexique ?">{% csrf_token %}
+          <input type="hidden" name="action" value="abandonner"><button type="submit" class="link small">Abandonner</button></form>
+      {% endif %}
+    {% endif %}
+  </div>
+</section>
+
+<div class="table-wrap">
+<table class="glossary-review">
+  <thead><tr><th>Terme</th><th>Type</th><th>Forme développée</th><th>Définition</th><th></th></tr></thead>
+  <tbody>
+    {% for entry in entries %}
+      <tr id="e{{ entry.pk }}">
+        <td><input form="f{{ entry.pk }}" type="text" name="term" value="{{ entry.term }}" maxlength="60" aria-label="Terme"></td>
+        <td><select form="f{{ entry.pk }}" name="kind" aria-label="Type">{% for value, label in kinds %}<option value="{{ value }}"{% if value == entry.kind %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></td>
+        <td><input form="f{{ entry.pk }}" type="text" name="expansion" value="{{ entry.expansion }}" maxlength="200" aria-label="Forme développée"></td>
+        <td><textarea form="f{{ entry.pk }}" name="definition" rows="2" aria-label="Définition">{{ entry.definition }}</textarea></td>
+        <td class="actions-cell">
+          {% if editable %}
+          <form method="post" action="{% url 'catalogue:glossary_entry' entry.pk %}" id="f{{ entry.pk }}">{% csrf_token %}
+            <button type="submit" name="action" value="enregistrer" class="small">Enregistrer</button>
+            <button type="submit" name="action" value="supprimer" class="small secondary" formnovalidate>Supprimer</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% if editable %}
+<form method="post" action="{% url 'catalogue:glossary_review_action' glossary.pk %}" class="card review-question" id="ajouter">{% csrf_token %}
+  <input type="hidden" name="action" value="ajouter">
+  <p class="eyebrow">Ajouter une entrée</p>
+  <div class="review-grid">
+    <label>Terme ou sigle<input type="text" name="term" maxlength="60" required></label>
+    <label>Forme développée (sigle)<input type="text" name="expansion" maxlength="200"></label>
+  </div>
+  <label>Définition<textarea name="definition" rows="2" required></textarea></label>
+  <div class="actions"><button type="submit" class="small">Ajouter</button></div>
+</form>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,14 @@
+# Dépendances de production. Versions bornées : les correctifs de sécurité
+# (patch) sont acceptés, les montées de version majeure se font volontairement.
+Django~=5.2.0            # version LTS (support jusqu'en avril 2028)
+psycopg[binary]~=3.2
+gunicorn~=23.0
+whitenoise~=6.9
+django-axes~=8.0
+argon2-cffi>=23.1,<26
+pypdf~=6.0              # import : pages et sommaire des PDF de l'ANSSI
+openpyxl~=3.1           # import : trames d'évaluation Excel de l'ANSSI
+defusedxml~=0.7          # actualités : lecture sûre des flux RSS externes
+pdfminer.six==20251230   # version audio : extraction du texte des PDF (espaces fiables)
+lameenc~=1.8             # version audio : encodage MP3 (LAME, LGPL)
+segno~=1.6               # double authentification : QR code (SVG) à scanner avec l'application

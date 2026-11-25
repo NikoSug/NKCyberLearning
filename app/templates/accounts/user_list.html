@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Utilisateurs et rôles — {{ instance_name }}{% endblock %}
+{% block content %}
+<header class="dash-head">
+  <div>
+    <p class="eyebrow">Administration</p>
+    <h1>Utilisateurs et rôles</h1>
+    <p class="muted small">
+      <strong>Rédacteur</strong> : écrit des cours et des podcasts dans l'atelier de rédaction, avec l'aide de l'IA ; ses contenus sont relus avant publication.
+      <strong>Gestionnaire de contenu</strong> : relit et publie ce qui est écrit ou généré, pilote les générations, gère le catalogue (et rédige aussi).
+      Les comptes administrateurs se gèrent dans l'administration.</p>
+  </div>
+</header>
+
+<details class="card new-user"{% if not page.object_list %} open{% endif %}>
+  <summary><strong>+ Créer un compte</strong></summary>
+  <form method="post" action="{% url 'accounts:user_create' %}" class="inline-form">{% csrf_token %}
+    <label>{{ new_form.username.label }}{{ new_form.username }}</label>
+    <label>{{ new_form.email.label }} <span class="muted">({% if email_enabled %}l'invitation y est envoyée{% else %}facultative{% endif %})</span>{{ new_form.email }}</label>
+    <label>{{ new_form.role.label }}{{ new_form.role }}</label>
+    <button type="submit">Créer et obtenir le lien</button>
+  </form>
+  <p class="small muted">Le compte n'a pas de mot de passe : la personne le choisit grâce au lien d'invitation (3 jours, un seul usage).</p>
+</details>
+
+<form method="get" class="filters">
+  <input type="search" name="q" value="{{ query }}" placeholder="Pseudo ou adresse e-mail" aria-label="Rechercher un compte">
+  <select name="role" aria-label="Rôle" data-autosubmit>
+    {% for value, label in role_filters %}<option value="{{ value }}"{% if value == role %} selected{% endif %}>{{ label }}{% if value == "redacteur" %} ({{ counts.redacteur }}){% elif value == "gestionnaire" %} ({{ counts.gestionnaire }}){% endif %}</option>{% endfor %}
+  </select>
+  <button type="submit" data-autosubmit-hide>Filtrer</button>
+  {% if query or role %}<a class="reset" href="{% url 'accounts:user_list' %}">Effacer</a>{% endif %}
+</form>
+
+<div class="table-wrap">
+  <table class="data-table user-table">
+    <thead><tr><th>Compte</th><th>Dernière connexion</th><th>Rédacteur</th><th>Gestionnaire</th><th>État</th></tr></thead>
+    <tbody>
+      {% for u in page %}
+        <tr{% if not u.is_active %} class="muted"{% endif %}>
+          <td><strong>{{ u.username }}</strong>{% if u.is_superuser %} <span class="pill">administrateur</span>{% endif %}
+            {% if u.email %}<br><span class="muted small">{{ u.email }}</span>{% endif %}</td>
+          <td class="small">{{ u.last_login|date:"d/m/Y H:i"|default:"jamais" }}</td>
+          {% if u.is_superuser or u == user %}
+            <td colspan="3" class="muted small">Tous les droits{% if u == user %} (vous){% endif %}</td>
+          {% else %}
+            {% for key, on in u.roles.items %}
+              <td>
+                <form method="post" action="{% url 'accounts:user_action' u.pk %}">{% csrf_token %}
+                  <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                  {% if on %}<button type="submit" name="action" value="retirer-{{ key }}" class="small" title="Retirer ce rôle">✓ Oui</button>
+                  {% else %}<button type="submit" name="action" value="donner-{{ key }}" class="small secondary" title="Donner ce rôle">Non</button>{% endif %}
+                </form>
+              </td>
+            {% endfor %}
+            <td>
+              <form method="post" action="{% url 'accounts:user_action' u.pk %}">{% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                {% if u.is_active %}<button type="submit" name="action" value="desactiver" class="link small" data-confirm="Désactiver le compte de {{ u.username }} ? Il ne pourra plus se connecter.">Actif · désactiver</button>
+                  <button type="submit" name="action" value="lien" class="link small" data-confirm="Créer un lien pour que {{ u.username }} choisisse un nouveau mot de passe ? L'ancien reste valable jusqu'à son utilisation.">{% if u.last_login %}Lien de mot de passe{% else %}Renvoyer l'invitation{% endif %}</button>
+                {% else %}<button type="submit" name="action" value="reactiver" class="link small">Désactivé · réactiver</button>{% endif %}
+              </form>
+            </td>
+          {% endif %}
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="empty-state">Aucun compte ne correspond.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if page.has_other_pages %}
+  <nav class="review-steps" aria-label="Pages">
+    {% if page.has_previous %}<a class="button secondary" href="?q={{ query|urlencode }}&amp;role={{ role }}&amp;page={{ page.previous_page_number }}">← Précédents</a>{% else %}<span></span>{% endif %}
+    <span class="muted small">Page {{ page.number }} sur {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}<a class="button secondary" href="?q={{ query|urlencode }}&amp;role={{ role }}&amp;page={{ page.next_page_number }}">Suivants →</a>{% else %}<span></span>{% endif %}
+  </nav>
+{% endif %}
+{% endblock %}

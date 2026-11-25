@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Générations — {{ instance_name }}{% endblock %}
+{% block content %}
+<header class="dash-head" data-auto-refresh="{% if command %}6{% else %}30{% endif %}">
+  <div>
+    <p class="eyebrow">Pilotage · actualisé toutes les 30 s</p>
+    <h1>Générations en arrière-plan</h1>
+    <p class="links small"><a href="{% url 'studio:home' %}">🖋️ Atelier de création</a> : écrire soi-même un cours ou un podcast, avec l'aide de l'IA.</p>
+    <p class="muted small">QCM, cours, podcasts et lexiques par l'IA locale ({{ model }}), podcasts et versions audio lus par synthèse vocale.
+      Une pause arrête la génération à sa prochaine étape ; le travail déjà fait est conservé.</p>
+  </div>
+  <div class="gen-controls">
+    {% if can_control %}
+      {% if command %}
+        <button type="button" disabled>⏳ {% if command.action == "lancer" %}Lancement{% else %}Arrêt{% endif %} en cours…</button>
+      {% else %}
+        {% if stopped_count %}
+          <form method="post" action="{% url 'catalogue:generation_action' 'services' %}">{% csrf_token %}
+            <input type="hidden" name="action" value="lancer">
+            <button type="submit"{% if not agent_alive %} disabled title="Agent du poste inactif : lancez .\dev up ou .\dev agent"{% endif %}>🚀 Lancer les services</button></form>
+        {% endif %}
+        {% if stopped_count < services|length %}
+          <form method="post" action="{% url 'catalogue:generation_action' 'services' %}" data-confirm="Arrêter les services de génération ? Les générations en cours reprendront au prochain lancement.">{% csrf_token %}
+            <input type="hidden" name="action" value="arreter">
+            <button type="submit" class="secondary"{% if not agent_alive %} disabled title="Agent du poste inactif : lancez .\dev up ou .\dev agent"{% endif %}>⏹ Arrêter les services</button></form>
+        {% endif %}
+      {% endif %}
+    {% endif %}
+    {% if paused_count < background_count %}
+      <form method="post" action="{% url 'catalogue:generation_action' 'toutes' %}">{% csrf_token %}
+        <input type="hidden" name="action" value="pause"><button type="submit" class="secondary">⏸ Tout mettre en pause</button></form>
+    {% endif %}
+    {% if paused_count %}
+      <form method="post" action="{% url 'catalogue:generation_action' 'toutes' %}">{% csrf_token %}
+        <input type="hidden" name="action" value="reprendre"><button type="submit">▶ Tout reprendre</button></form>
+    {% endif %}
+    <form method="post" action="{% url 'catalogue:generation_action' 'jeu' %}"
+          title="Coupe aussi l'assistant et libère la carte graphique">{% csrf_token %}
+      <input type="hidden" name="action" value="{% if gaming.paused %}reprendre{% else %}pause{% endif %}">
+      <button type="submit" class="{% if gaming.paused %}warn-button{% else %}secondary{% endif %}">🎮 {% if gaming.paused %}Quitter le mode jeu{% else %}Mode jeu{% endif %}</button>
+    </form>
+  </div>
+</header>
+
+{% if can_control and not agent_alive %}
+  <p class="gen-banner muted-banner">🔌 L'agent du poste ne répond pas : les boutons « Lancer / Arrêter les services » sont inactifs.
+    Lancez <code>.\dev up</code> (ou <code>.\dev agent</code>) sur le PC.</p>
+{% elif command %}
+  <p class="gen-banner">⏳ <strong>{{ command.get_action_display }}</strong> : {{ command.get_status_display|lower }}{% if command.action == "lancer" %} (le premier lancement peut télécharger le modèle d'IA){% endif %}…</p>
+{% elif last_command and last_command.status == "echec" %}
+  <p class="gen-banner error-banner">✕ {{ last_command.get_action_display }} a échoué le {{ last_command.finished_at|date:"d/m à H:i" }} : {{ last_command.message|truncatechars:200 }}</p>
+{% endif %}
+{% if gaming.paused %}
+  <p class="gen-banner">🎮 <strong>Mode jeu actif</strong> depuis le {{ gaming.paused_at|date:"d/m à H:i" }} : générations en pause, assistant coupé,
+    carte graphique libérée.</p>
+{% elif paused_count %}
+  <p class="gen-banner">⏸ <strong>{{ paused_count }} génération{{ paused_count|pluralize }} sur {{ background_count }} en pause.</strong>
+    L'assistant reste disponible.</p>
+{% endif %}
+
+{# Ordre de passage : une génération à la fois, la première qui a du travail #}
+<section class="gen-order" id="ordre" aria-labelledby="ordre-titre">
+  <p class="gen-order-intro"><strong id="ordre-titre">Ordre de passage</strong>
+    <span class="muted small">Une génération à la fois, pour ne pas partager la carte graphique : la première de la liste qui a du travail
+      passe, l'élément en cours n'est jamais coupé ; une génération en pause ou arrêtée laisse passer les suivantes.</span></p>
+  <ol class="gen-order-list">
+    {% for item in services %}
+      <li class="gen-order-item state-{{ item.s.state }}">
+        <span class="gen-order-rank">{{ forloop.counter }}</span>
+        <span class="gen-order-name">{{ item.icon }} {{ item.title }}</span>
+        <form method="post" action="{% url 'catalogue:generation_action' 'ordre' %}" class="gen-order-move">{% csrf_token %}
+          <input type="hidden" name="item" value="{{ item.kind }}">
+          <button type="submit" name="action" value="monter" class="icon" title="Passer avant" aria-label="Faire passer {{ item.title }} avant"{% if forloop.first %} disabled{% endif %}>←</button>
+          <button type="submit" name="action" value="descendre" class="icon" title="Passer après" aria-label="Faire passer {{ item.title }} après"{% if forloop.last %} disabled{% endif %}>→</button>
+        </form>
+      </li>
+    {% endfor %}
+  </ol>
+  <form method="post" action="{% url 'catalogue:generation_action' 'ordre' %}" class="gen-order-option">{% csrf_token %}
+    <span class="small">🎧 Versions audio demandées depuis la page d'écoute :
+      <strong>{% if audio_users_first %}passent devant tout{% else %}suivent l'ordre de passage{% endif %}</strong></span>
+    {% if audio_users_first %}
+      <button type="submit" name="action" value="utilisateurs-non" class="small secondary">Leur faire suivre l'ordre</button>
+    {% else %}
+      <button type="submit" name="action" value="utilisateurs-oui" class="small secondary">Les faire passer devant</button>
+    {% endif %}
+  </form>
+  <form method="post" action="{% url 'catalogue:generation_action' 'prerelu' %}" class="gen-order-option" id="prerelecture">{% csrf_token %}
+    <span class="small">🔎 Pré-relecteur IA (QCM et cours, à la fin de chaque génération, avant votre relecture) :
+      <strong>{% if prereview_on %}activé{% elif not prereview_allowed %}coupé sur cette installation (PREREVIEW_ENABLED=0){% else %}désactivé{% endif %}</strong></span>
+    {% if prereview_allowed %}
+      {% if prereview_on %}
+        <button type="submit" name="action" value="desactiver" class="small secondary">Le désactiver</button>
+      {% else %}
+        <button type="submit" name="action" value="activer" class="small secondary">L'activer</button>
+      {% endif %}
+    {% endif %}
+  </form>
+</section>
+
+{# Vue d'ensemble : une tuile par génération #}
+<div class="gen-overview">
+  {% for item in services %}
+    <a class="gen-tile state-{{ item.s.state }}" href="#{{ item.kind }}">
+      <span class="gen-tile-head"><span class="gen-tile-name">{{ item.icon }} {{ item.title }}</span>{% include "catalogue/_generation_state.html" with state=item.s.state %}</span>
+      <span class="gen-tile-value">{{ item.s.percent }}<small>%</small></span>
+      <progress class="progress" value="{{ item.s.covered }}" max="{{ item.s.eligible|default:1 }}">{{ item.s.percent }} %</progress>
+      <span class="muted small">{{ item.s.covered }} / {{ item.s.eligible }} {{ item.unit }}</span>
+      <span class="gen-tile-foot small">
+        {% if item.s.running %}<span>{{ item.s.running|length }} en cours</span>{% endif %}
+        <span>{{ item.s.pending }} en file</span>
+        {% if item.s.failed_count %}<span class="error">{{ item.s.failed_count }} échec{{ item.s.failed_count|pluralize }}</span>{% endif %}
+        {% if item.s.pace.remaining %}<span>reste ≈ {{ item.s.pace.remaining }}</span>{% endif %}
+      </span>
+    </a>
+  {% endfor %}
+</div>
+
+<div class="gen-details">
+  {% for item in services %}
+    {% include "catalogue/_generation_card.html" with s=item.s kind=item.kind icon=item.icon title=item.title service=item.service unit=item.plural %}
+  {% endfor %}
+</div>
+{% endblock %}

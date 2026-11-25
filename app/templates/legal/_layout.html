@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — {{ instance_name }}{% endblock %}
+{% block content %}
+<article class="card legal">
+  <h1>{{ title }}</h1>
+  {% if incomplete and user.is_superuser %}
+    <p class="flash flash-warning">Modèle à compléter : renseignez ORGANISATION_NAME, ORGANISATION_ADDRESS, CONTACT_EMAIL, DPO_EMAIL et
+      HOSTING_PROVIDER dans le fichier .env, puis faites relire ces pages par un juriste.</p>
+  {% endif %}
+  {% block legal %}{% endblock %}
+  <p class="small muted legal-nav">
+    <a href="{% url 'legal_mentions' %}">Mentions légales</a> · <a href="{% url 'legal_privacy' %}">Confidentialité</a> ·
+    <a href="{% url 'legal_terms' %}">Conditions d'utilisation</a> · <a href="{% url 'legal_credits' %}">Crédits et licences</a></p>
+</article>
+{% endblock %}

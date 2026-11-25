@@ -1,0 +1,28 @@
+{% comment %}Niveau, objectif du jour et série : tableau de bord et page « Ma progression ». Attend `xp` (résumé).{% endcomment %}
+<section class="card xp-hero" aria-label="Ma progression">
+  <div class="xp-hero-level">
+    <span class="level-badge" aria-hidden="true">{{ xp.level }}</span>
+    <div class="xp-hero-body">
+      <p class="eyebrow">Niveau {{ xp.level }} · {{ xp.total }} XP au total</p>
+      <p class="xp-hero-title">{{ xp.title }}</p>
+      <progress class="progress xp" value="{{ xp.level_xp }}" max="{{ xp.level_size }}" aria-label="Progression vers le niveau {{ xp.level|add:1 }}">{{ xp.level_percent }} %</progress>
+      <p class="muted small">Encore {{ xp.to_next }} XP pour le niveau {{ xp.level|add:1 }} — {{ xp.next_title }}</p>
+    </div>
+  </div>
+  <div class="xp-hero-goal">
+    <p class="eyebrow">Objectif du jour</p>
+    <p class="xp-hero-title">{{ xp.today }}<small> / {{ xp.goal }} XP</small>{% if xp.goal_reached %} <span class="pill ok">Atteint</span>{% endif %}</p>
+    <progress class="progress goal" value="{{ xp.today }}" max="{{ xp.goal }}" aria-label="Objectif du jour : {{ xp.goal_percent }} %">{{ xp.goal_percent }} %</progress>
+    <p class="muted small">{% if xp.goal_reached %}Bravo, objectif rempli !{% else %}Encore {{ xp.goal_left }} XP à gagner aujourd'hui{% endif %}</p>
+    {% if xp.double_xp %}<p class="small potion-note">🧪 Double XP jusqu'à {{ xp.double_xp_until|time:"H:i" }}</p>{% endif %}
+  </div>
+  <div class="xp-hero-streak{% if xp.streak_today %} on{% elif xp.streak_at_risk %} risk{% endif %}">
+    <span class="flame" aria-hidden="true">🔥</span>
+    <div>
+      <p class="xp-hero-title">{{ xp.streak }}<small> jour{% if xp.streak > 1 %}s{% endif %}</small></p>
+      <p class="muted small">{% if xp.streak_today %}Série validée aujourd'hui{% elif xp.vacation_until %}🏖️ En vacances jusqu'au {{ xp.vacation_until|date:"j F" }} : votre série est protégée{% elif xp.rest_today and xp.streak %}Jour de repos : votre série est protégée (apprendre quand même la prolonge){% elif xp.streak_at_risk %}Gagnez 10 XP aujourd'hui pour garder votre série{% else %}Gagnez 10 XP pour lancer une série{% endif %}</p>
+      {% if xp.frozen_yesterday %}<p class="small freeze-note">❄️ Série protégée hier par un gel</p>{% endif %}
+      {% if xp.freezes %}<p class="small freeze-note">❄️ {{ xp.freezes }} gel{{ xp.freezes|pluralize }} en réserve</p>{% endif %}
+    </div>
+  </div>
+</section>

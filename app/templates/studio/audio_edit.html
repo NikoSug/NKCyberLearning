@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Enregistrement — {{ upload.guide.title }} — Atelier de création — {{ instance_name }}{% endblock %}
+{% block content %}
+<p class="back-link"><a href="{{ back_url }}">← Versions audio enregistrées</a></p>
+<header class="dash-head">
+  <div>
+    <p class="eyebrow">🎧 Version audio enregistrée{% if upload.author %} · par {{ upload.author.username }}{% endif %}</p>
+    <h1>{{ upload.guide.title }}</h1>
+    <p class="links small"><a href="{{ upload.guide.get_absolute_url }}">Fiche du guide</a>
+      {% if current and current.status == "prete" %}<span class="muted">· version actuelle : {{ current.voice|default:"voix de synthèse" }}, {{ current.duration_display }} — remplacée à la publication</span>{% endif %}</p>
+  </div>
+</header>
+
+<section class="editor-bar{% if problems and upload.editorial_status %} has-problems{% endif %}">
+  {% include "studio/_status.html" with code=upload.editorial_status|default:"publie" label=upload.get_editorial_status_display hint=hint %}
+  <div class="editor-bar-actions">
+    {% if upload.editorial_status == "redaction" and editable and not manager %}
+      <form method="post" action="{% url 'studio:audio_action' upload.pk %}">{% csrf_token %}<button type="submit" name="action" value="soumettre">Soumettre à la relecture</button></form>
+    {% endif %}
+    {% if manager and upload.editorial_status %}
+      <form method="post" action="{% url 'studio:audio_action' upload.pk %}" data-confirm="Remplacer la version audio actuelle du guide par cet enregistrement ?">{% csrf_token %}<button type="submit" name="action" value="publier">Publier</button></form>
+    {% endif %}
+    {% if manager and upload.editorial_status == "a_relire" %}
+      <form method="post" action="{% url 'studio:audio_action' upload.pk %}">{% csrf_token %}<button type="submit" name="action" value="renvoyer" class="secondary">Renvoyer au rédacteur</button></form>
+    {% endif %}
+    {% if upload.editorial_status and not upload.published_at %}
+      <form method="post" action="{% url 'studio:audio_action' upload.pk %}" data-confirm="Supprimer cet enregistrement et ses fichiers ?">{% csrf_token %}<button type="submit" name="action" value="supprimer" class="link small">Supprimer</button></form>
+    {% endif %}
+  </div>
+</section>
+
+<div class="studio-main">
+    <section class="card studio-block" id="chapitres">
+      <h2>Chapitres <span class="count">{{ parts|length }}</span>{% if total %} <span class="muted small">≈ {{ total }} min</span>{% endif %}</h2>
+      <ol class="studio-steps">
+        {% for part in parts %}
+          <li id="p{{ part.pk }}">
+            <div class="studio-step-head">
+              <span class="queue-position">{{ part.position }}</span>
+              <span class="studio-step-title">{{ part.title }} <span class="muted small">{% widthratio part.duration_seconds 60 1 %} min</span></span>
+              {% if editable %}
+                <form method="post" action="{% url 'studio:audio_part' upload.pk %}" class="queue-actions">{% csrf_token %}
+                  <input type="hidden" name="part" value="{{ part.pk }}">
+                  <button type="submit" name="action" value="monter" class="icon" aria-label="Monter"{% if forloop.first %} disabled{% endif %}>↑</button>
+                  <button type="submit" name="action" value="descendre" class="icon" aria-label="Descendre"{% if forloop.last %} disabled{% endif %}>↓</button>
+                  <button type="submit" name="action" value="retirer" class="icon danger" aria-label="Retirer" data-confirm="Retirer ce chapitre ?">✕</button>
+                </form>
+              {% endif %}
+            </div>
+            <audio controls preload="none" src="{% url 'studio:audio_file' upload.pk part.pk %}" class="studio-audio"></audio>
+            {% if editable %}
+              <form method="post" action="{% url 'studio:audio_part' upload.pk %}" class="studio-step-note">{% csrf_token %}
+                <input type="hidden" name="part" value="{{ part.pk }}"><input type="hidden" name="action" value="renommer">
+                <input type="text" name="title" value="{{ part.title }}" maxlength="255" aria-label="Titre du chapitre">
+                <button type="submit" class="small secondary">Renommer</button>
+              </form>
+            {% endif %}
+          </li>
+        {% empty %}<li class="empty-state">Déposez le premier chapitre ci-dessous.</li>{% endfor %}
+      </ol>
+      {% if editable %}
+        <form method="post" action="{% url 'studio:audio_part' upload.pk %}" enctype="multipart/form-data" class="studio-inline-form" id="ajouter">{% csrf_token %}
+          <input type="hidden" name="action" value="ajouter">
+          <label>{{ form.title.label }}{{ form.title }}</label>
+          <label>{{ form.audio.label }} <span class="muted">(55 Mo au plus)</span><input type="file" name="audio" accept="audio/mpeg,.mp3" required></label>
+          <button type="submit" class="small" data-busy="Envoi du fichier…">Ajouter le chapitre</button>
+        </form>
+      {% endif %}
+    </section>
+</div>
+{% endblock %}

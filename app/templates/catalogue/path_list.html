@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Parcours de lecture — {{ instance_name }}{% endblock %}
+{% block content %}
+{% include "catalogue/_catalogue_tabs.html" %}
+
+<p class="muted">Un parcours par thème, du niveau débutant au niveau avancé. Dans chaque niveau, les documents courts
+  viennent d'abord : chaque lecture prépare la suivante. Ajoutez un parcours entier ou un seul niveau à votre lecture.</p>
+
+{% if current %}
+  <h2 class="group-title">Mes parcours en cours</h2>
+  <div class="path-grid">
+    {% for path in current %}
+      <a class="card path-mini" href="{% url 'catalogue:path_detail' path.category.slug %}">
+        <span class="path-name">{{ path.category.name }}</span>
+        <progress class="progress" value="{{ path.read }}" max="{{ path.total }}" aria-label="{{ path.percent }} % lu">{{ path.percent }} %</progress>
+        <span class="muted small">{{ path.read }} / {{ path.total }} lus{% if path.next_guide %} · prochain : {{ path.next_guide.title|truncatechars:60 }}{% endif %}</span>
+      </a>
+    {% endfor %}
+  </div>
+{% endif %}
+
+{% if custom_paths %}
+  <h2 class="group-title">Parcours sur mesure <span class="count">{{ custom_paths|length }}</span></h2>
+  <p class="muted small">Conçus par l'équipe : des guides choisis dans un ordre précis, avec un mot à chaque étape.</p>
+  <div class="course-grid">
+    {% for custom in custom_paths %}
+      <a class="card course-card" href="{{ custom.get_absolute_url }}">
+        <span class="course-kind">🧭 {% if custom.category %}{{ custom.category.name }}{% else %}Parcours sur mesure{% endif %}</span>
+        <span class="course-title">{{ custom.title }}</span>
+        {% if custom.description %}<span class="muted small">{{ custom.description|truncatechars:150 }}</span>{% endif %}
+        <span class="course-meta"><span class="level level-{{ custom.level }}">{{ custom.get_level_display }}</span>
+          <span class="muted small">{{ custom.steps.all|length }} guide{{ custom.steps.all|length|pluralize }}</span></span>
+      </a>
+    {% endfor %}
+  </div>
+{% endif %}
+
+<h2 class="group-title">Tous les parcours <span class="count">{{ paths|length }}</span></h2>
+{% for path in paths %}
+  <section class="card path-card{% if path.done %} done{% endif %}">
+    <div class="path-head">
+      <span class="path-step" aria-hidden="true">{{ forloop.counter }}</span>
+      <div class="path-title">
+        <h2><a href="{% url 'catalogue:path_detail' path.category.slug %}">{{ path.category.name }}</a>
+          {% if path.done %}<span class="pill ok">Terminé</span>{% endif %}</h2>
+        {% if path.category.description %}<p class="muted small">{{ path.category.description }}</p>{% endif %}
+      </div>
+      <div class="path-progress">
+        <span class="small"><strong>{{ path.read }}</strong> / {{ path.total }} lus · {{ path.duration_display }}</span>
+        <progress class="progress" value="{{ path.read }}" max="{{ path.total }}" aria-label="{{ path.percent }} % lu">{{ path.percent }} %</progress>
+      </div>
+    </div>
+    <ol class="stages">
+      {% for stage in path.stages %}
+        <li class="stage{% if stage.done %} done{% endif %}">
+          <span class="level level-{{ stage.level }}">{{ stage.label }}</span>
+          <span class="muted small">{{ stage.guides|length }} guide{{ stage.guides|length|pluralize }} · {{ stage.read }} lu{{ stage.read|pluralize }}</span>
+        </li>
+      {% endfor %}
+    </ol>
+    <div class="actions">
+      <a class="button small" href="{% url 'catalogue:path_detail' path.category.slug %}">Voir le parcours</a>
+      {% if path.to_add %}
+        <form method="post" action="{% url 'catalogue:reading_add_path' path.category.slug %}" class="inline">
+          {% csrf_token %}<input type="hidden" name="niveau" value="{{ filters.niveau }}">
+          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+          <button type="submit" class="small secondary">+ Ajouter {{ path.to_add|length }} guide{{ path.to_add|length|pluralize }} à ma lecture</button>
+        </form>
+      {% else %}<span class="badge listed">Dans ma lecture</span>{% endif %}
+    </div>
+  </section>
+{% empty %}
+  <p class="empty-state">Aucun parcours ne correspond à ces filtres.</p>
+{% endfor %}
+{% endblock %}

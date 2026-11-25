@@ -1,0 +1,8 @@
+{# Notes du pré-relecteur IA (catalogue/prereview.py) : une liste `notes` ou une note `note` ; rien n'est décidé à la place du relecteur. #}
+{% if notes or note %}
+<aside class="prereview-notes" aria-label="Notes du pré-relecteur IA">
+  <p class="small"><strong>🔎 {{ title|default:"Pré-relecteur IA" }}</strong>
+    <span class="muted">— avis automatique, à vérifier : la décision reste la vôtre.</span></p>
+  <ul class="small">{% for item in notes %}<li>{{ item|linebreaksbr }}</li>{% endfor %}{% if note %}<li>{{ note|linebreaksbr }}</li>{% endif %}</ul>
+</aside>
+{% endif %}

@@ -1,0 +1,11 @@
+<a class="card course-card{% if course.passed and course.passed >= course.lesson_count %} done{% endif %}" href="{{ course.get_absolute_url }}">
+  <span class="course-kind">{% if course.kind == "theme" %}🎓 {{ course.category.name }}{% else %}📘 Guide ANSSI{% endif %}</span>
+  <span class="course-title">{{ course.title }}</span>
+  {% if course.summary %}<span class="muted small">{{ course.summary|truncatechars:150 }}</span>{% endif %}
+  <span class="course-meta">
+    <span class="level level-{{ course.level }}">{{ course.get_level_display }}</span>
+    <span class="muted small">{{ course.lesson_count }} leçon{{ course.lesson_count|pluralize }}</span>
+    {% if course.passed %}<span class="small{% if course.passed >= course.lesson_count %} ok-text{% endif %}">{{ course.passed }} / {{ course.lesson_count }} ✓</span>{% endif %}
+  </span>
+  {% if course.passed %}<progress class="progress" value="{{ course.passed }}" max="{{ course.lesson_count }}">{{ course.passed }}</progress>{% endif %}
+</a>

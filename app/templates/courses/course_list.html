@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Cours — {{ instance_name }}{% endblock %}
+{% block content %}
+<header class="dash-head">
+  <div>
+    <p class="eyebrow">Apprendre pas à pas</p>
+    <h1>Cours</h1>
+    <p class="muted">Des leçons courtes et simples, tirées des guides de l'ANSSI. Chaque leçon se termine par un petit quiz
+      qui ouvre la suivante ; un examen final valide le cours.</p>
+  </div>
+  {% if user.is_author %}<div class="head-actions">
+    <a class="button small" href="{% url 'studio:create' 'cours' %}">+ Ajouter un cours</a>
+    {% if user.is_content_manager %}<a class="button secondary small" href="{% url 'catalogue:review_list' %}?type=cours">✍️ Relecture</a>{% endif %}
+  </div>{% endif %}
+</header>
+
+{% if in_progress %}
+  <h2 class="group-title">Reprendre</h2>
+  <div class="path-grid">
+    {% for course in in_progress %}
+      <a class="card path-mini" href="{{ course.get_absolute_url }}">
+        <span class="path-name">{{ course.title }}</span>
+        <progress class="progress" value="{{ course.passed }}" max="{{ course.lesson_count }}">{{ course.passed }}</progress>
+        <span class="muted small">{{ course.passed }} / {{ course.lesson_count }} leçon{{ course.lesson_count|pluralize }} réussie{{ course.passed|pluralize }}</span>
+      </a>
+    {% endfor %}
+  </div>
+{% endif %}
+
+<h2 class="group-title">Cours par thème <span class="count">{{ themes|length }}</span></h2>
+<p class="muted small">Pour débuter : chaque thème de la cybersécurité expliqué depuis les bases.</p>
+<div class="course-grid">
+  {% for course in themes %}
+    {% include "courses/_course_card.html" %}
+  {% empty %}
+    <p class="empty-state">Aucun cours thématique publié pour l'instant.</p>
+  {% endfor %}
+</div>
+
+<h2 class="group-title" id="guides">Cours par guide <span class="count">{{ guides|length }}</span></h2>
+<p class="muted small">Pour approfondir : l'essentiel d'un guide de l'ANSSI, en version simplifiée.</p>
+<form method="get" action="#guides" class="filters course-filters">
+  <input type="search" name="q" value="{{ query }}" placeholder="Rechercher un guide" aria-label="Rechercher un cours de guide">
+  <select name="niveau" aria-label="Niveau" data-autosubmit>
+    <option value="">Tous niveaux</option>
+    {% for value, label in levels %}<option value="{{ value }}"{% if value == level %} selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+  <button type="submit" class="secondary small" data-autosubmit-hide>Filtrer</button>
+</form>
+<div class="course-grid">
+  {% for course in guides %}
+    {% include "courses/_course_card.html" %}
+  {% empty %}
+    <p class="empty-state">{% if query or level %}Aucun cours ne correspond à cette recherche.{% else %}Aucun cours de guide publié pour l'instant.{% endif %}</p>
+  {% endfor %}
+</div>
+{% endblock %}

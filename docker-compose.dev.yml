@@ -1,0 +1,56 @@
+# Surcouche pour le développement local (sur ton poste, pas sur le serveur).
+# Lancement : docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+# Accès     : http://localhost:8000
+
+services:
+  web:
+    command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+    environment:
+      DJANGO_DEBUG: "1"
+      DJANGO_SECURE_COOKIES: "0"
+    volumes:
+      - ./app:/app
+      - media:/app/media
+    read_only: false
+    ports:
+      - "127.0.0.1:8000:8000"   # exposé uniquement sur la boucle locale
+    networks:
+      - frontend   # en développement : imports ANSSI lancés depuis ce conteneur (.\dev import)
+
+  news:
+    volumes:
+      - ./app:/app
+    read_only: false
+
+  narrator:
+    volumes:
+      - ./app:/app
+      - media:/app/media
+    read_only: false
+
+  quizgen:
+    volumes:
+      - ./app:/app     # en dev, la publication écrit aussi les QCM dans app/catalogue/data/quiz/
+      - media:/app/media:ro   # PDF des guides (sans lui : « fichier introuvable » pour chaque guide)
+    read_only: false
+
+  coursegen:
+    volumes:
+      - ./app:/app
+      - media:/app/media:ro
+    read_only: false
+
+  podcastgen:
+    volumes:
+      - ./app:/app
+      - media:/app/media
+    read_only: false
+
+  glossarygen:
+    volumes:
+      - ./app:/app
+      - media:/app/media:ro
+    read_only: false
+
+  nginx:
+    profiles: ["prod"]   # nginx désactivé en développement

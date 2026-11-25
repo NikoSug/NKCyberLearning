@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Atelier de création — {{ instance_name }}{% endblock %}
+{% block content %}
+<header class="studio-hero">
+  <div>
+    <p class="eyebrow">Atelier de création</p>
+    <h1>Que voulez-vous créer ?</h1>
+    <p class="muted">Ajoutez des guides, des référentiels, des certifications, des parcours, des cours, des podcasts…
+      Écrivez vous-même{% if ai_enabled %} ou faites-vous aider par l'IA locale{% endif %}.
+      {% if user.is_content_manager %}Vos ajouts restent invisibles tant que vous ne les publiez pas.
+      {% else %}Quand c'est prêt, soumettez : un gestionnaire de contenu relit et publie.{% endif %}</p>
+  </div>
+  {% if user.is_content_manager %}
+    <nav class="studio-hero-links small">
+      <a href="{% url 'catalogue:review_list' %}">✍️ Relecture</a>
+      {% if ai_enabled %}<a href="{% url 'catalogue:generation_dashboard' %}">📊 Générations</a>{% endif %}
+      {% if user.is_superuser %}<a href="{% url 'accounts:user_list' %}">👤 Rôles</a>{% endif %}
+    </nav>
+  {% endif %}
+</header>
+
+{% if to_review %}
+  <section class="card studio-panel review-panel">
+    <h2>À relire <span class="count">{{ to_review|length }}</span></h2>
+    <ul class="studio-entries">
+      {% for content, entry in to_review|slice:":10" %}
+        <li><a href="{{ entry.url }}"><span class="studio-entry-icon" aria-hidden="true">{{ content.icon }}</span>
+          <span class="studio-entry-title">{{ entry.title }}</span>
+          <span class="muted small">{{ content.label }}{% if entry.author %} · par {{ entry.author.username }}{% endif %}</span></a></li>
+      {% endfor %}
+    </ul>
+    {% if to_review|length > 10 %}<p class="muted small">… et {{ to_review|length|add:-10 }} autre(s), visibles dans chaque type.</p>{% endif %}
+  </section>
+{% endif %}
+
+{% for group in groups %}{% if group.cards %}
+  <section class="studio-group">
+    <div class="studio-group-head">
+      <h2>{{ group.label }}</h2>
+      <p class="muted small">{{ group.intro }}</p>
+    </div>
+    <div class="studio-grid">
+      {% for card in group.cards %}
+        <article class="card studio-card">
+          <a class="studio-card-main" href="{{ card.type.list_url }}">
+            <span class="studio-card-icon" aria-hidden="true">{{ card.type.icon }}</span>
+            <span class="studio-card-title">{{ card.type.plural }}</span>
+            <span class="muted small">{{ card.type.description }}</span>
+          </a>
+          <div class="studio-card-foot">
+            <span class="studio-card-stats small">
+              {% if card.brouillons %}<span class="pill">{{ card.brouillons }} brouillon{{ card.brouillons|pluralize }}</span>{% endif %}
+              {% if card.relecture %}<span class="pill warn">{{ card.relecture }} à relire</span>{% endif %}
+            </span>
+            <a class="button small" href="{{ card.type.new_url }}">+ Ajouter</a>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+{% endif %}{% endfor %}
+
+<section class="card studio-panel">
+  <h2>Mes brouillons <span class="count">{{ draft_count }}</span></h2>
+  {% if drafts %}
+    <ul class="studio-entries">
+      {% for content, entry in drafts %}
+        <li><a href="{{ entry.url }}"><span class="studio-entry-icon" aria-hidden="true">{{ content.icon }}</span>
+          <span class="studio-entry-title">{{ entry.title }}</span>
+          <span class="muted small">{{ content.label }}{% if entry.status %} · {{ entry.status }}{% endif %}{% if entry.author and entry.author != user %} · par {{ entry.author.username }}{% endif %}</span></a></li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="empty-state">Aucun brouillon en cours : choisissez un type ci-dessus et cliquez sur « + Ajouter ».</p>
+  {% endif %}
+</section>
+{% endblock %}

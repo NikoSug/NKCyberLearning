@@ -1,0 +1,4 @@
+-c requirements.txt
+-r requirements.in
+pip-audit~=2.7     # audit des dépendances vulnérables
+bandit~=1.7        # analyse statique de sécurité du code Python

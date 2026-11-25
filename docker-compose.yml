@@ -1,0 +1,365 @@
+# Déploiement de production : une instance par client, sur site ou sur une machine virtuelle dans le cloud.
+# Première installation : ./scripts/install.sh   — mises à jour : ./scripts/deploy.sh   (voir docs/installation.md)
+# Profils : « ia » (IA locale, GPU NVIDIA), « letsencrypt » (certificat automatique) ; activés par
+# COMPOSE_PROFILES dans .env.
+#
+# Réseaux : « backend » (base, application, IA) et « proxy » (nginx ↔ application) sont internes, sans accès
+# Internet ; seuls nginx (ports publiés), les actualités (flux RSS) et les services d'IA (téléchargement des
+# modèles) sont aussi sur « frontend ».
+
+name: cyberlearning
+
+x-hardening: &hardening
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  pids_limit: 512
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
+
+services:
+  db:
+    <<: *hardening
+    image: postgres:17-alpine
+    # Mot de passe du super-utilisateur et du rôle applicatif : .env.db (lu par ce seul service), ou .env
+    # pour une installation antérieure à cette séparation.
+    env_file:
+      - path: .env.db
+        required: false
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-cyberlearning}
+      POSTGRES_USER: ${POSTGRES_USER:-cyberlearning}
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./scripts/db-init:/docker-entrypoint-initdb.d:ro   # rôle applicatif sans droits d'administration
+    mem_limit: ${DB_MEM_LIMIT:-1g}
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Aucun port publié : la base n'est joignable que depuis le réseau interne.
+
+  web:
+    <<: *hardening
+    build: .
+    image: cyberlearning-web:latest
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - media:/app/media
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    cap_drop:
+      - ALL
+    mem_limit: ${WEB_MEM_LIMIT:-1500m}
+    networks:
+      - backend
+      - proxy   # joignable par nginx seulement ; aucun accès Internet
+
+  # Actualités cyber du tableau de bord : récupérées toutes les heures depuis les flux RSS.
+  news:
+    <<: *hardening
+    image: cyberlearning-web:latest
+    command: ["python", "manage.py", "fetch_news", "--boucle"]
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+      RUN_MIGRATIONS: "0"   # le service web s'en charge
+    depends_on:
+      web:
+        condition: service_healthy
+    volumes:
+      - media:/app/media    # import des contenus ANSSI (PDF) lancé depuis ce service
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m
+    cap_drop:
+      - ALL
+    mem_limit: 512m
+    healthcheck:
+      disable: true
+    networks:
+      - backend
+      - frontend   # accès sortant aux flux RSS (et import des contenus ANSSI : voir install.sh)
+
+  # Synthèse vocale Kyutai TTS (profil « ia », GPU NVIDIA) isolée dans son conteneur, aucun port publié.
+  # Le modèle (≈ 4 Go) est téléchargé au premier usage dans le volume tts_models, puis chargé à la demande.
+  tts:
+    <<: *hardening
+    profiles: ["ia"]
+    build: ./tts
+    image: cyberlearning-tts:latest
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m
+    cap_drop:
+      - ALL
+    volumes:
+      - tts_models:/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    networks:
+      - backend
+      - frontend   # téléchargement du modèle et de la voix (Hugging Face)
+
+  # Génère les versions audio des guides demandées (file d'attente en base), section par section :
+  # réécriture du texte pour l'oral par l'IA locale (Ollama), puis lecture par « tts ».
+  narrator:
+    <<: *hardening
+    profiles: ["ia"]
+    image: cyberlearning-web:latest
+    command: ["python", "manage.py", "narrate", "--boucle"]
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+      RUN_MIGRATIONS: "0"   # le service web s'en charge
+      NARRATION_TTS_URL: http://tts:8000
+      QUIZ_LLM_URL: http://ollama:11434
+    depends_on:
+      web:
+        condition: service_healthy
+      tts:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    volumes:
+      - media:/app/media    # écrit les fichiers MP3
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    cap_drop:
+      - ALL
+    mem_limit: ${WORKER_MEM_LIMIT:-1g}
+    healthcheck:
+      disable: true
+    networks:
+      - backend
+
+  # --- Génération des QCM par IA locale (profil « ia » : démarré à la demande, GPU NVIDIA requis) ---
+  # docker compose --profile ia up -d   puis   docker compose exec quizgen python manage.py generate_quizzes --tout
+  ollama:
+    <<: *hardening
+    profiles: ["ia"]
+    image: ollama/ollama:0.34.2
+    environment:
+      OLLAMA_NUM_PARALLEL: "2"        # deux guides générés en parallèle sur le GPU
+      OLLAMA_KEEP_ALIVE: "30m"
+    volumes:
+      - ollama_models:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    networks:
+      - backend
+      - frontend   # téléchargement des modèles (ollama pull)
+
+  quizgen:
+    <<: *hardening
+    profiles: ["ia"]
+    image: cyberlearning-web:latest
+    command: ["python", "manage.py", "generate_quizzes", "--boucle"]
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+      RUN_MIGRATIONS: "0"
+      QUIZ_LLM_URL: http://ollama:11434
+    depends_on:
+      web:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    volumes:
+      - media:/app/media:ro   # lit les PDF des guides
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    cap_drop:
+      - ALL
+    mem_limit: ${WORKER_MEM_LIMIT:-1g}
+    healthcheck:
+      disable: true
+    networks:
+      - backend
+
+  # --- Génération des cours par IA locale (profil « ia ») : même modèle et mêmes règles que quizgen ---
+  coursegen:
+    <<: *hardening
+    profiles: ["ia"]
+    image: cyberlearning-web:latest
+    command: ["python", "manage.py", "generate_courses", "--boucle"]
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+      RUN_MIGRATIONS: "0"
+      QUIZ_LLM_URL: http://ollama:11434
+    depends_on:
+      web:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    volumes:
+      - media:/app/media:ro   # lit les PDF des guides
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    cap_drop:
+      - ALL
+    mem_limit: ${WORKER_MEM_LIMIT:-1g}
+    healthcheck:
+      disable: true
+    networks:
+      - backend
+
+  # --- Podcasts par IA locale (profil « ia ») : scripts par Ollama, puis enregistrement à deux voix par « tts » ---
+  podcastgen:
+    <<: *hardening
+    profiles: ["ia"]
+    image: cyberlearning-web:latest
+    command: ["python", "manage.py", "generate_podcasts", "--boucle"]
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+      RUN_MIGRATIONS: "0"
+      QUIZ_LLM_URL: http://ollama:11434
+      NARRATION_TTS_URL: http://tts:8000
+    depends_on:
+      web:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+      tts:
+        condition: service_healthy
+    volumes:
+      - media:/app/media    # lit les PDF des guides, écrit les MP3 des épisodes
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    cap_drop:
+      - ALL
+    mem_limit: ${WORKER_MEM_LIMIT:-1g}
+    healthcheck:
+      disable: true
+    networks:
+      - backend
+
+  # --- Lexiques des guides par IA locale (profil « ia ») ---
+  glossarygen:
+    <<: *hardening
+    profiles: ["ia"]
+    image: cyberlearning-web:latest
+    command: ["python", "manage.py", "generate_glossaries", "--boucle"]
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+      RUN_MIGRATIONS: "0"
+      QUIZ_LLM_URL: http://ollama:11434
+    depends_on:
+      web:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    volumes:
+      - media:/app/media:ro   # lit les PDF des guides
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    cap_drop:
+      - ALL
+    mem_limit: ${WORKER_MEM_LIMIT:-1g}
+    healthcheck:
+      disable: true
+    networks:
+      - backend
+
+  # Reverse proxy : TLS, en-têtes de sécurité, limitation de débit. Sa configuration est produite au démarrage
+  # depuis nginx/templates/ avec les réglages de l'instance (nom du serveur, certificat, HSTS, accès à l'admin).
+  nginx:
+    <<: *hardening
+    image: nginxinc/nginx-unprivileged:1.27-alpine
+    depends_on:
+      web:
+        condition: service_healthy
+    ports:
+      - "${HTTP_PORT:-80}:8080"
+      - "${HTTPS_PORT:-443}:8443"
+    environment:
+      SERVER_NAME: ${SERVER_NAME:-_}
+      SSL_CERTIFICATE: ${SSL_CERTIFICATE:-/etc/nginx/certs/fullchain.pem}
+      SSL_CERTIFICATE_KEY: ${SSL_CERTIFICATE_KEY:-/etc/nginx/certs/privkey.pem}
+      HSTS_VALUE: ${HSTS_VALUE:-}                     # « max-age=31536000 » avec un certificat définitif
+      ADMIN_PATH: ${DJANGO_ADMIN_URL_PATH:-gestion}
+      ADMIN_ALLOW_FROM: ${ADMIN_ALLOW_FROM:-all}       # ex. 10.0.0.0/8 : administration réservée à ce réseau
+    # Rechargement toutes les 6 h : prend en compte les certificats renouvelés par « certbot ».
+    command: ["/bin/sh", "-c", "while :; do sleep 6h; nginx -s reload; done & exec /docker-entrypoint.sh nginx -g 'daemon off;'"]
+    volumes:
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+      - letsencrypt:/etc/letsencrypt:ro
+      - acme:/var/www/acme:ro
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m
+      - /etc/nginx/conf.d:mode=1777,size=1m   # configuration produite au démarrage
+    cap_drop:
+      - ALL
+    mem_limit: 256m
+    networks:
+      - frontend
+      - proxy
+
+  # Certificat Let's Encrypt (profil « letsencrypt », nom de domaine public requis) : renouvellement automatique.
+  # La première demande est faite par install.sh.
+  certbot:
+    <<: *hardening
+    profiles: ["letsencrypt"]
+    image: certbot/certbot:v2.11.0
+    entrypoint: ["/bin/sh", "-c", "trap exit TERM; while :; do certbot renew --webroot -w /var/www/acme --quiet; sleep 12h & wait $${!}; done"]
+    volumes:
+      - letsencrypt:/etc/letsencrypt
+      - acme:/var/www/acme
+    # Le crochet de déploiement (install.sh) rend la clé lisible par le groupe de nginx (gid 101).
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+    mem_limit: 256m
+    networks:
+      - frontend
+
+networks:
+  backend:
+    internal: true   # base, application, IA : pas d'accès Internet
+  proxy:
+    internal: true   # nginx ↔ application
+  frontend:
+
+volumes:
+  db_data:
+  media:
+  ollama_models:
+  tts_models:
+  letsencrypt:
+  acme:

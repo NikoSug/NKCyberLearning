@@ -1,0 +1,23 @@
+{% extends "legal/_layout.html" %}
+{% block legal %}
+<h2>Contenus</h2>
+<ul class="plain-list">
+  <li><strong>Publications de l'ANSSI</strong> (guides, référentiels, dispositifs) —
+    <a href="https://www.etalab.gouv.fr/licence-ouverte-open-licence/" target="_blank" rel="noopener noreferrer">Licence Ouverte v2.0 (Etalab)</a>.
+    Source et date indiquées sur chaque page ; adaptations sans validation de l'ANSSI.</li>
+  <li><strong>Certifications professionnelles</strong> — noms et programmes résumés à titre indicatif ; marques de leurs détenteurs,
+    la page officielle fait foi.</li>
+</ul>
+
+<h2>Intelligence artificielle (exécutée sur les serveurs de l'instance)</h2>
+<ul class="plain-list">
+  <li><strong>Qwen 3.5</strong> (Alibaba Cloud), via <strong>Ollama</strong> — licences Apache 2.0 et MIT.</li>
+  <li><strong>Kyutai TTS 1.6B</strong> — licence CC BY 4.0 ; voix enregistrées par Kyutai — CC0 ; bibliothèque <strong>moshi</strong> — MIT.</li>
+</ul>
+
+<h2>Logiciels libres</h2>
+<ul class="plain-list">
+  <li>Django (BSD-3), PostgreSQL (licence PostgreSQL), nginx (BSD-2), gunicorn (MIT), WhiteNoise (MIT), django-axes (MIT), argon2-cffi (MIT)</li>
+  <li>psycopg (LGPL-3), pypdf (BSD-3), pdfminer.six (MIT), openpyxl (MIT), defusedxml (PSF), segno (BSD-3), lameenc / LAME (LGPL)</li>
+</ul>
+{% endblock %}

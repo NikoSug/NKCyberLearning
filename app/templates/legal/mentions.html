@@ -1,0 +1,17 @@
+{% extends "legal/_layout.html" %}
+{% block legal %}
+<h2>Éditeur</h2>
+<p>{{ instance_name }} est exploité par <strong>{{ org.name|default:"[raison sociale]" }}</strong>{% if org.id %} ({{ org.id }}){% endif %},
+  {{ org.address|default:"[adresse]" }}.<br>Contact : {% if org.email %}<a href="mailto:{{ org.email }}">{{ org.email }}</a>{% else %}[adresse e-mail]{% endif %}.</p>
+
+<h2>Hébergement</h2>
+<p>{{ org.host|default:"[hébergeur : nom et adresse ; ou « serveurs de l'organisation » pour une installation sur site]" }}.</p>
+
+<h2>Contenus</h2>
+<p>Les guides, référentiels et dispositifs présentés sont des publications de l'Agence nationale de la sécurité des systèmes
+  d'information (ANSSI), réutilisées sous <a href="https://www.etalab.gouv.fr/licence-ouverte-open-licence/" target="_blank" rel="noopener noreferrer">Licence Ouverte v2.0</a> :
+  chaque page indique le document source et sa date. Les cours, questionnaires, lexiques, versions audio et podcasts en sont des
+  adaptations, produites avec l'aide d'une intelligence artificielle locale puis relues ; ils n'ont pas été validés par l'ANSSI,
+  qui n'est pas associée à cette plateforme. En cas de doute, le document original fait foi.</p>
+<p>Les noms de certification cités sont des marques de leurs détenteurs respectifs ; {{ instance_name }} n'est affilié à aucun d'eux.</p>
+{% endblock %}

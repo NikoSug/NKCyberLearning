@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Référentiels — {{ instance_name }}{% endblock %}
+{% block content %}
+{% include "catalogue/_catalogue_tabs.html" %}
+
+{% for kind, referentials in groups.items %}
+  <h2 class="group-title">{{ kind }}</h2>
+  {% for r in referentials %}{% include "catalogue/_referential_item.html" %}{% endfor %}
+{% empty %}
+  <p class="empty-state">Aucun référentiel ne correspond à ces filtres.</p>
+{% endfor %}
+{% endblock %}

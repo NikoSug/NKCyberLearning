@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: cyberlearning
+          POSTGRES_USER: cyberlearning
+          POSTGRES_PASSWORD: ci-only-password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U cyberlearning"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DJANGO_SECRET_KEY: ci-only-secret-key-not-used-anywhere-else-0123456789
+      POSTGRES_PASSWORD: ci-only-password
+      POSTGRES_HOST: localhost
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install --require-hashes -r requirements-dev.txt
+      - name: Migrations à jour
+        working-directory: app
+        run: python manage.py makemigrations --check --dry-run
+      - name: Tests
+        working-directory: app
+        run: python manage.py test --parallel
+      - name: Contrôle de configuration de production
+        working-directory: app
+        env:
+          DJANGO_ALLOWED_HOSTS: example.org
+          DJANGO_HSTS_SECONDS: "31536000"
+          DJANGO_SECURE_SSL_REDIRECT: "1"
+        run: python manage.py check --deploy --fail-level ERROR
+      - name: Analyse de sécurité du code (bandit)
+        run: bandit -r app -x app/*/tests.py,app/*/tests_*.py,app/*/migrations -ll
+      - name: Dépendances vulnérables (pip-audit)
+        run: pip-audit -r requirements.txt
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Construction de l'image
+        run: docker build -t cyberlearning-web:ci .
+      - name: Scripts d'installation et configuration Compose
+        run: |
+          for f in scripts/*.sh scripts/db-init/*.sh; do bash -n "$f"; done
+          cp .env.example .env
+          docker compose config -q
+          docker compose --profile ia --profile letsencrypt config -q

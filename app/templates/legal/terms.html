@@ -1,0 +1,31 @@
+{% extends "legal/_layout.html" %}
+{% block legal %}
+<h2>Objet</h2>
+<p>{{ instance_name }} est une plateforme de formation à la cybersécurité, mise à disposition par {{ org.name|default:"[raison sociale]" }}
+  à ses utilisateurs. L'utiliser implique d'accepter ces conditions.</p>
+
+<h2>Compte</h2>
+<p>Le compte est personnel. Vous gardez votre mot de passe confidentiel et activez la double authentification lorsqu'elle est demandée.
+  Signalez sans délai tout usage que vous ne reconnaissez pas (activité visible dans <strong>Sécurité et données</strong>).</p>
+
+<h2>Usage acceptable</h2>
+<p>Il est interdit de tenter d'accéder à des données ou à des fonctions non autorisées, de perturber le service, d'automatiser des
+  requêtes en masse ou de détourner l'assistant de son usage pédagogique.</p>
+
+<h2>Contenus générés par intelligence artificielle</h2>
+<p>Cours, questionnaires, lexiques, résumés, versions audio, podcasts et réponses de l'assistant sont produits avec l'aide d'une IA
+  et peuvent comporter des erreurs, malgré leur relecture. Ils ne remplacent ni les documents originaux de l'ANSSI, qui font foi,
+  ni un conseil professionnel adapté à votre système d'information.</p>
+
+<h2>Propriété intellectuelle</h2>
+<p>Les publications de l'ANSSI sont réutilisées sous Licence Ouverte v2.0. Les marques de certification appartiennent à leurs détenteurs.
+  Les autres éléments de la plateforme (code, mise en forme, contenus rédigés par l'exploitant) ne peuvent être reproduits sans accord.
+  Voir les <a href="{% url 'legal_credits' %}">crédits et licences</a>.</p>
+
+<h2>Disponibilité et responsabilité</h2>
+<p>Le service est fourni avec un soin raisonnable, sans garantie de disponibilité continue ; les fonctions d'IA peuvent être
+  ralenties ou indisponibles. L'exploitant ne saurait être tenu responsable de décisions prises sur la seule base des contenus générés.</p>
+
+<h2>Modifications</h2>
+<p>Ces conditions peuvent évoluer ; la version en ligne est celle qui s'applique.</p>
+{% endblock %}

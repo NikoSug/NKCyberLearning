@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Lexique — {{ instance_name }}{% endblock %}
+{% block content %}
+{% include "catalogue/_catalogue_tabs.html" %}
+
+<p class="muted">Les sigles et termes techniques des guides de l'ANSSI, expliqués simplement. Pendant la lecture d'un guide,
+  le bouton « 📖 Lexique » affiche ceux du guide ouvert. <span class="count">{{ total }} entrée{{ total|pluralize }}</span></p>
+
+{% if letters %}
+  <nav class="lexicon-letters" aria-label="Lettres">
+    {% for letter, items in letters %}<a href="#lettre-{{ letter }}">{{ letter }}</a>{% endfor %}
+  </nav>
+  {% for letter, items in letters %}
+    <h2 class="lexicon-letter" id="lettre-{{ letter }}">{{ letter }}</h2>
+    {% for item in items %}
+      <article class="card lexicon-entry">
+        <h3>{{ item.entry.term }}{% if item.entry.expansion %} <span class="muted">— {{ item.entry.expansion }}</span>{% endif %}
+          {% if item.entry.kind == "sigle" %}<span class="chip">sigle</span>{% endif %}</h3>
+        <p>{{ item.entry.definition }}</p>
+        <p class="muted small">Dans : {% for guide in item.guides|slice:":4" %}<a href="{{ guide.get_absolute_url }}">{{ guide.title|truncatechars:60 }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}{% if item.guides|length > 4 %} et {{ item.guides|length|add:-4 }} autre{{ item.guides|length|add:-4|pluralize }}{% endif %}</p>
+      </article>
+    {% endfor %}
+  {% endfor %}
+{% else %}
+  <p class="empty-state">{% if has_filters %}Aucun terme ne correspond à cette recherche.{% else %}Le lexique est en préparation : les lexiques des guides
+    apparaissent ici une fois relus et publiés.{% endif %}</p>
+{% endif %}
+{% endblock %}

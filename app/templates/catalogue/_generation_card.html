@@ -1,0 +1,106 @@
+<section class="card gen-card state-{{ s.state }}" id="{{ kind }}">
+  <header class="gen-card-head">
+    <div>
+      <h2>{{ icon }} {{ title }} {% include "catalogue/_generation_state.html" with state=s.state %}</h2>
+      <p class="muted small">
+        <code>{{ service }}</code>{% if kind == "qcm" %} · {{ s.control.workers }} guide{{ s.control.workers|pluralize }} à la fois{% endif %}
+        · {% if s.control.last_seen %}actif il y a {{ s.control.last_seen|timesince }}{% else %}jamais démarré{% endif %}
+      </p>
+    </div>
+    <form method="post" action="{% url 'catalogue:generation_action' kind %}">{% csrf_token %}
+      {% if s.control.paused %}
+        <input type="hidden" name="action" value="reprendre"><button type="submit" class="small">▶ Reprendre</button>
+      {% else %}
+        <input type="hidden" name="action" value="pause"><button type="submit" class="small secondary">⏸ Pause</button>
+      {% endif %}
+    </form>
+  </header>
+
+  {% if s.control.paused and s.control.note %}<p class="gen-alert">{{ s.control.note }}</p>
+  {% elif s.control.paused and s.control.paused_at %}<p class="gen-note">En pause depuis le {{ s.control.paused_at|date:"d/m à H:i" }}{% if s.control.paused_by %} ({{ s.control.paused_by }}){% endif %}.</p>
+  {% elif s.state == "attente" %}<p class="gen-note">⏳ Attend son tour : {{ s.holder }} passe avant (une génération à la fois, voir l'ordre de passage en haut de la page).</p>
+  {% elif s.state == "arret" %}<p class="gen-alert">Le service ne donne plus signe de vie : utilisez « 🚀 Lancer les services » en haut de la page (ou <code>.\dev ia</code>).</p>{% endif %}
+
+  {% if kind == "audio" and s.outdated %}<p class="gen-note">{{ s.outdated }} version{{ s.outdated|pluralize }} audio date{{ s.outdated|pluralize:"nt" }} d'un système précédent (ancienne voix) : elle{{ s.outdated|pluralize }} {{ s.outdated|pluralize:"est,sont" }} comptée{{ s.outdated|pluralize }} dans « à générer » ci-dessous.</p>{% endif %}
+
+  <div class="gen-body">
+    <dl class="gen-metrics">
+      <div title="{{ unit }}"><dt>Faits</dt><dd>{{ s.covered }}<small class="muted"> / {{ s.eligible }}</small></dd></div>
+      <div><dt>En file</dt><dd>{{ s.pending }}</dd></div>
+      <div><dt>En cours</dt><dd>{{ s.running|length }}</dd></div>
+      <div class="{% if s.failed_count %}has-failures{% endif %}"><dt>Échecs</dt><dd>{{ s.failed_count }}</dd></div>
+      {% if kind == "audio" %}
+        <div title="Durée d'écoute des versions prêtes"><dt>Écoute</dt><dd class="small-value">{{ s.hours|default:"0 s" }}</dd></div>
+      {% else %}
+        <div><dt>À relire</dt><dd><a href="{% url 'catalogue:review_list' %}?type={{ kind }}">{{ s.counts.a_relire }}</a></dd></div>
+      {% endif %}
+    </dl>
+    {# Temps de génération : même présentation pour tous les types ; « — » quand on ne sait pas (anciennes données) #}
+    <dl class="gen-metrics gen-timing" aria-label="Temps de génération">
+      <div title="Temps mis pour le dernier {% if kind == 'cours' %}cours{% elif kind == 'podcast' %}podcast (écriture et enregistrement){% else %}guide{% endif %} terminé"><dt>Dernière</dt><dd class="small-value">{{ s.pace.last|default:"—" }}</dd></div>
+      <div title="Moyenne {% if s.pace.samples %}des {{ s.pace.samples }} dernières générations{% else %}des dernières générations{% endif %}"><dt>Moyenne</dt><dd class="small-value">{{ s.pace.average|default:"—" }}</dd></div>
+      <div title="Temps écoulé depuis le début de la tâche en cours"><dt>Tâche en cours</dt><dd class="small-value">{{ s.pace.elapsed|default:"—" }}</dd></div>
+      <div title="Estimation pour la file et les tâches en cours, d'après la moyenne"><dt>Reste estimé</dt><dd class="small-value">{{ s.pace.remaining|default:"—" }}</dd></div>
+    </dl>
+    {% if s.pace.detail %}<p class="muted small gen-timing-detail">Par série : {{ s.pace.detail }}</p>{% endif %}
+    <figure class="gen-chart" title="{{ s.chart.total }} terminé(s) sur 14 jours">
+      <svg viewBox="0 0 280 60" role="img" aria-label="{{ s.chart.total }} terminés sur 14 jours">
+        {% for bar in s.chart.bars %}
+          <rect x="{{ bar.x }}" y="{{ bar.y }}" width="16" height="{{ bar.height }}" rx="3" class="gen-bar{% if forloop.last %} today{% endif %}"><title>{{ bar.label }} : {{ bar.value }}</title></rect>
+          {% if bar.value %}<text x="{{ bar.x|add:8 }}" y="{{ bar.y|add:-3 }}" class="gen-bar-value">{{ bar.value }}</text>{% endif %}
+          {% if forloop.first or forloop.last %}<text x="{{ bar.x|add:8 }}" y="59" class="gen-bar-label">{{ bar.label }}</text>{% endif %}
+        {% endfor %}
+        <line x1="0" y1="48.5" x2="280" y2="48.5" class="gen-axis"></line>
+      </svg>
+      <figcaption class="muted small">{{ s.chart.total }} terminé{{ s.chart.total|pluralize }} sur 14 jours</figcaption>
+    </figure>
+  </div>
+
+  {% if s.running %}
+    <ul class="gen-running">
+      {% for item in s.running %}
+        <li>
+          <span class="gen-name">{% firstof item.title item.guide.title item.referential.name %}</span>
+          {% include "catalogue/_job_progress.html" with job=item.job %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="empty-state">Aucune génération en cours{% if s.pending %} : {{ s.pending }} en file{% endif %}.</p>
+  {% endif %}
+
+  {% if s.next %}
+    <details class="gen-fold">
+      <summary>Prochains dans la file <span class="count">{{ s.pending }}</span></summary>
+      <ol class="gen-list">
+        {% for item in s.next %}<li>{% firstof item.title item.guide.title item.referential.name %}{% if kind == "audio" and item.priority == 0 %} <span class="pill">demandée</span>{% elif kind == "podcast" and item.status == "a_enregistrer" %} <span class="pill">à enregistrer</span>{% elif kind != "audio" and item.progress %} <span class="muted small">· {{ item.progress }}</span>{% endif %}</li>{% endfor %}
+      </ol>
+      {% if s.pending > 5 %}<p class="muted small">… et {{ s.pending|add:-5 }} autre{{ s.pending|add:-5|pluralize }}.</p>{% endif %}
+      <p class="small"><a href="{% url 'catalogue:generation_queue' kind %}">Gérer la file : ordre et retrait →</a></p>
+    </details>
+  {% endif %}
+
+  {% if s.failed %}
+    <details class="gen-fold failures">
+      <summary>Échecs <span class="count">{{ s.failed_count }}</span></summary>
+      <ul class="gen-list plain">
+        {% for item in s.failed %}
+          <li class="gen-failed">
+            <span>{% firstof item.title item.guide.title item.referential.name %}<br><span class="small error">{{ item.error|truncatechars:140 }}</span></span>
+            <form method="post" action="{% url 'catalogue:generation_action' kind %}">{% csrf_token %}
+              <input type="hidden" name="action" value="relancer"><input type="hidden" name="guide" value="{{ item.guide.pk }}"><input type="hidden" name="item" value="{{ item.pk }}">
+              <button type="submit" class="small secondary">Réessayer</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+      <form method="post" action="{% url 'catalogue:generation_action' kind %}" data-confirm="Remettre en file les {{ s.failed_count }} échec(s) ?">{% csrf_token %}
+        <input type="hidden" name="action" value="relancer-echecs"><button type="submit" class="link small">Tout réessayer</button>
+      </form>
+    </details>
+  {% endif %}
+
+  <footer class="gen-card-foot">
+    {% include "catalogue/_generation_queue.html" with missing=s.missing unit=unit small=True %}
+  </footer>
+</section>

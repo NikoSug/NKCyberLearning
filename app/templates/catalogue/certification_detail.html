@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}{{ certification.name }} — {{ instance_name }}{% endblock %}
+{% block content %}
+<p class="back-link"><a href="{% url 'catalogue:certification_list' %}">← Certifications</a></p>
+<article class="card">
+  <p class="eyebrow">{{ certification.get_kind_display }}{% if certification.issuer %} · {{ certification.issuer }}{% endif %}</p>
+  <h1>{{ certification.name }}{% if certification.acronym %} <span class="tag">{{ certification.acronym }}</span>{% endif %}</h1>
+  {% if certification.level %}<p><span class="level level-{{ certification.level }}">{{ certification.get_level_display }}</span></p>{% endif %}
+  {% if certification.description %}<p>{{ certification.description }}</p>{% endif %}
+  <dl class="details">
+    {% if certification.audience %}<dt>Public visé</dt><dd>{{ certification.audience }}</dd>{% endif %}
+    {% if certification.prerequisites %}<dt>Prérequis</dt><dd>{{ certification.prerequisites }}</dd>{% endif %}
+    {% if certification.exam_format %}<dt>Évaluation</dt><dd>{{ certification.exam_format }}</dd>{% endif %}
+    {% if certification.validity %}<dt>Validité</dt><dd>{{ certification.validity }}</dd>{% endif %}
+  </dl>
+  {% if certification.source_url %}
+    <p class="muted"><a href="{{ certification.source_url }}" target="_blank" rel="noopener noreferrer">Page officielle</a>{% if certification.kind == "individual" %} — les formats d'examen évoluent, elle fait foi{% endif %}.</p>
+  {% endif %}
+</article>
+
+<section class="card">
+  <h2>Guides ANSSI cités</h2>
+  {% if cited_guides %}
+    <div class="section-head">
+      <p class="muted">{{ cited_guides|length }} guide{{ cited_guides|length|pluralize }} cité{{ cited_guides|length|pluralize }} par le référentiel · {{ cited_read }} lu{{ cited_read|pluralize }}</p>
+      {% if missing_from_list %}
+        <form method="post" action="{% url 'catalogue:reading_add_certification' certification.slug %}" class="inline">
+          {% csrf_token %}<button type="submit" class="secondary">+ Ajouter les {{ missing_from_list }} guide{{ missing_from_list|pluralize }} à ma lecture</button>
+        </form>
+      {% endif %}
+    </div>
+    {% for guide in cited_guides %}{% include "catalogue/_guide_item.html" %}{% endfor %}
+  {% else %}
+    <p class="empty-state">Aucun guide ANSSI n'est cité par le référentiel de cette certification.</p>
+  {% endif %}
+  {% if categories %}
+    <p class="muted">Domaines utiles pour la préparer :
+      {% for c in categories %}<a href="{% url 'catalogue:guide_list' %}?categorie={{ c.slug }}">{{ c.name }}</a>{% if not forloop.last %} · {% endif %}{% endfor %}</p>
+  {% endif %}
+  {% if other_citations %}
+    <details>
+      <summary>Autres documents ANSSI cités ({{ other_citations|length }})</summary>
+      <ul>{% for c in other_citations %}<li>{% if c.code %}<span class="ref">[{{ c.code }}]</span> {% endif %}{{ c.title }}</li>{% endfor %}</ul>
+    </details>
+  {% endif %}
+</section>
+
+{% if referentials %}
+<section class="card">
+  <h2>Référentiel et grille de suivi</h2>
+  {% for r in referentials %}
+    <div class="item">
+      <div class="item-body">
+        <a href="{{ r.get_absolute_url }}" class="item-title">{{ r.title }}</a>
+        <p class="meta">{% if r.version %}<span>{{ r.version_display }}</span>{% endif %}
+          {% if r.trame %}<a href="{% url 'catalogue:referential_trame' r.slug %}">Trame d'évaluation (Excel)</a>{% endif %}
+          <a href="{% url 'catalogue:referential_export' r.slug %}">Ma grille (Excel)</a></p>
+      </div>
+      {% if r.document %}{% include "catalogue/_add_button.html" with doc=r kind="referentiel" %}{% endif %}
+    </div>
+  {% endfor %}
+</section>
+{% endif %}
+{% if certification.kind == "individual" and "ANSSI" not in certification.issuer %}{% include "catalogue/_third_party.html" with name=certification.acronym|default:certification.name issuer=certification.issuer url=certification.source_url %}{% endif %}
+{% endblock %}

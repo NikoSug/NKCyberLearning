@@ -1,0 +1,47 @@
+{% comment %}
+  En-tête commun du catalogue : filtres (identiques pour tous les onglets, conservés
+  d'un onglet à l'autre) puis onglets.
+{% endcomment %}
+{% with section=request.resolver_match.url_name %}
+<header class="dash-head">
+  <div>
+    <p class="eyebrow">Les documents de référence</p>
+    <h1>Catalogue</h1>
+  </div>
+  {% if user.is_author %}
+    {% if section == 'guide_list' %}{% url 'studio:create' 'guide' as add_url %}{% elif section == 'referential_list' %}{% url 'studio:create' 'referentiel' as add_url %}{% elif section == 'certification_list' %}{% url 'studio:create' 'certification' as add_url %}{% elif section == 'exam_list' %}{% url 'studio:create' 'programme' as add_url %}{% elif section == 'path_list' %}{% url 'studio:create' 'parcours' as add_url %}{% endif %}
+    {% if add_url %}<div class="head-actions"><a class="button small" href="{{ add_url }}">+ Ajouter {% if section == 'guide_list' %}un guide{% elif section == 'referential_list' %}un référentiel{% elif section == 'certification_list' %}une certification{% elif section == 'exam_list' %}un programme{% else %}un parcours{% endif %}</a></div>{% endif %}
+  {% endif %}
+</header>
+<form method="get" class="filters catalogue-filters">
+  <input type="search" name="q" value="{{ filters.q }}" placeholder="Rechercher…" aria-label="Rechercher">
+  <select name="domaine" aria-label="Domaine" data-autosubmit>
+    <option value="">Tous les domaines</option>
+    {% for c in categories %}<option value="{{ c.slug }}" {% if c.slug == filters.domaine %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+  </select>
+  <select name="niveau" aria-label="Niveau" data-autosubmit>
+    <option value="">Tous les niveaux</option>
+    {% for value, label in levels %}<option value="{{ value }}" {% if value == filters.niveau %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+  {% if section == 'guide_list' %}
+  <select name="qcm" aria-label="Questionnaire" data-autosubmit>
+    <option value="">Avec ou sans QCM</option>
+    {% for value, label in quiz_filters %}<option value="{{ value }}" {% if value == filters.qcm %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+  <select name="audio" aria-label="Version audio" data-autosubmit>
+    <option value="">Avec ou sans audio</option>
+    {% for value, label in audio_filters %}<option value="{{ value }}" {% if value == filters.audio %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+  {% else %}{% if filters.qcm %}<input type="hidden" name="qcm" value="{{ filters.qcm }}">{% endif %}{% if filters.audio %}<input type="hidden" name="audio" value="{{ filters.audio }}">{% endif %}{% endif %}
+  <button type="submit" data-autosubmit-hide>Filtrer</button>
+  {% if has_filters %}<a class="reset" href="{{ request.path }}">Effacer</a>{% endif %}
+</form>
+<nav class="tabs" aria-label="Catalogue">
+  <a href="{% url 'catalogue:path_list' %}{{ filter_query }}" {% if section == 'path_list' %}aria-current="page"{% endif %}>Parcours</a>
+  <a href="{% url 'catalogue:guide_list' %}{{ filter_query }}" {% if section == 'guide_list' %}aria-current="page"{% endif %}>Guides</a>
+  <a href="{% url 'catalogue:referential_list' %}{{ filter_query }}" {% if section == 'referential_list' %}aria-current="page"{% endif %}>Référentiels</a>
+  <a href="{% url 'catalogue:certification_list' %}{{ filter_query }}" {% if section == 'certification_list' %}aria-current="page"{% endif %}>Certifications</a>
+  <a href="{% url 'catalogue:exam_list' %}{{ filter_query }}" {% if section == 'exam_list' %}aria-current="page"{% endif %}>Programmes d'examen</a>
+  <a href="{% url 'catalogue:glossary_index' %}{{ filter_query }}" {% if section == 'glossary_index' %}aria-current="page"{% endif %}>Lexique</a>
+</nav>
+{% endwith %}

@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Révision du jour — {{ instance_name }}{% endblock %}
+{% block content %}
+<p class="back-link"><a href="{% url 'catalogue:tests_overview' %}">← Mes tests</a></p>
+<header class="dash-head">
+  <p class="eyebrow">{{ review.date|date:"l j F" }} · {{ questions|length }} questions de {{ guide_count }} guide{{ guide_count|pluralize }}{% if streak > 1 %} · {{ streak }} jours de suite{% endif %}</p>
+  <h1>{% if review.number > 1 %}Seconde révision{% else %}Révision du jour{% endif %}</h1>
+</header>
+
+{% if attempt %}
+  {% include "catalogue/_quiz_results.html" with show_guide=True message="Les questions ratées reviendront dès demain ; celles réussies reviendront de plus en plus espacées. Une nouvelle révision sera prête demain." %}
+  {% if second_possible %}
+    <section class="card offer">
+      <span class="bonus-icon" aria-hidden="true">🔁</span>
+      <div>
+        <h2>Encore envie de réviser ?</h2>
+        <p class="muted">{{ second_review.description }}{% if xp.level < second_review.min_level %} Disponible dès le niveau {{ second_review.min_level }}.{% endif %}</p>
+      </div>
+      {% if xp.level >= second_review.min_level %}
+        <form method="post" action="{% url 'catalogue:buy_second_review' %}" data-confirm="Acheter une seconde révision pour {{ second_review.price }} émeraudes ?">
+          {% csrf_token %}<button type="submit" class="buy"{% if xp.emeralds < second_review.price %} disabled title="Pas assez d'émeraudes"{% endif %}>{% include "progression/_gem.html" %}{{ second_review.price }}</button>
+        </form>
+      {% endif %}
+    </section>
+  {% endif %}
+  <p class="actions">
+    <a class="button" href="{% url 'catalogue:tests_overview' %}">Mes tests</a>
+    <a class="button secondary" href="{% if review.number > 1 %}{% url 'catalogue:daily_review_number' review.number %}{% else %}{% url 'catalogue:daily_review' %}{% endif %}">Refaire la révision</a>
+    {% if second_bought and review.number == 1 %}<a class="button secondary" href="{% url 'catalogue:daily_review_number' 2 %}">Seconde révision</a>{% endif %}
+  </p>
+{% else %}
+  {% include "catalogue/_quiz_form.html" with show_guide=True %}
+{% endif %}
+{% endblock %}

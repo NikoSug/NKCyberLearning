@@ -1,0 +1,17 @@
+{% comment %}
+  Bouton « + » d'ajout à Ma lecture. Paramètres : doc (guide ou référentiel annoté
+  in_list / finished_at), kind ("guide" ou "referentiel").
+{% endcomment %}
+{% if doc.finished_at %}
+  <span class="badge read" title="Lu le {{ doc.finished_at|date:'d/m/Y' }}">Lu</span>
+{% elif doc.in_list %}
+  <a class="badge listed" href="{% url 'catalogue:reading_list' %}" title="Voir ma lecture">Dans ma lecture</a>
+{% else %}
+  <form method="post" action="{% url 'catalogue:reading_add' %}" class="inline">
+    {% csrf_token %}
+    <input type="hidden" name="kind" value="{{ kind }}">
+    <input type="hidden" name="slug" value="{{ doc.slug }}">
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <button type="submit" class="add" title="Ajouter à ma lecture" aria-label="Ajouter « {{ doc.title }} » à ma lecture">+</button>
+  </form>
+{% endif %}

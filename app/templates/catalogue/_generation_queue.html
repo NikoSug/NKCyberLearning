@@ -1,0 +1,23 @@
+{% comment %}
+Boutons de mise en file, identiques pour chaque génération (relecture et tableau de bord).
+Paramètres : kind (qcm, cours, lexique, audio), missing (nombre restant), unit (pluriel), small (boutons réduits).
+{% endcomment %}
+<div class="queue-actions">
+  {% if missing %}
+    <form method="post" action="{% url 'catalogue:generation_action' kind %}">{% csrf_token %}
+      <input type="hidden" name="action" value="file"><input type="hidden" name="nombre" value="10">
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <button type="submit" class="{% if small %}small{% endif %}">Générer les {% if missing < 10 %}{{ missing }}{% else %}10{% endif %} prochains</button>
+    </form>
+    {% if missing > 10 %}
+      <form method="post" action="{% url 'catalogue:generation_action' kind %}" data-confirm="Mettre en file les {{ missing }} {{ unit }} manquants ?">{% csrf_token %}
+        <input type="hidden" name="action" value="file"><input type="hidden" name="nombre" value="tout">
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <button type="submit" class="secondary{% if small %} small{% endif %}">Tout générer ({{ missing }})</button>
+      </form>
+    {% endif %}
+    <span class="muted small">{{ missing }} {{ unit }} à générer</span>
+  {% else %}
+    <span class="muted small">Rien à mettre en file : tout est généré ou déjà en file.</span>
+  {% endif %}
+</div>
